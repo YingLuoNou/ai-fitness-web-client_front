@@ -111,7 +111,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onBeforeUnmount, computed } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount, computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
 const playVoice = inject('playVoice')
 
@@ -205,7 +205,6 @@ const fetchDashboardData = async () => {
 const triggerWelcomeVoice = async (username, planStatus) => {
   const token = localStorage.getItem('auth_token')
   
-  // 按照你的业务逻辑生成话术
   let textToSpeak = ''
   if (planStatus.today_exercises.length === 0) {
     textToSpeak = `欢迎回来，${username}。今天是休息日，好好放松一下肌肉吧。`
@@ -215,10 +214,12 @@ const triggerWelcomeVoice = async (username, planStatus) => {
     textToSpeak = `欢迎回来，${username}。今天还有 ${100 - planStatus.progress_percent}% 的进度未完成，请点击启动今日计划。`
   }
   
+  // 1. 发起请求前，先触发一次动效，让UI瞬间响应
   playVoice(textToSpeak)
+  const startTime = Date.now() // 记录请求开始时间戳
 
   try {
-    await fetch(`${API_BASE_URL}/api/train/tts-play/`, {
+    const response = await fetch(`${API_BASE_URL}/api/train/tts-play/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -226,12 +227,34 @@ const triggerWelcomeVoice = async (username, planStatus) => {
       },
       body: JSON.stringify({ 
         text: textToSpeak,
-        voice: 'zh-CN-YunxiNeural' // 男教练音色
+        voice: 'zh-CN-YunxiNeural' 
       })
     })
-    // 提示：此处后续可以派发一个全局事件给左侧边栏，让那个 AI 图标开始发光闪烁
+
+    if (response.ok) {
+      const data = await response.json()
+      
+      // 2. 接口返回后，计算请求耗掉了多少秒
+      const elapsedSec = ((Date.now() - startTime) / 1000 ) 
+      
+      if (data.duration) {
+        // 计算音频真正的剩余播放时间
+        const remainingSec = data.duration - elapsedSec + 2.5
+        
+        if (remainingSec > 0) {
+          // 如果音频还没播完，更新动效定时器，补齐剩余时间
+          playVoice(textToSpeak, remainingSec)
+        } else {
+          // 如果请求耗时超过了音频时长（例如后端的 play_tts_sync 是阻塞播完才返回），直接停止动效
+          stopVoice()
+        }
+      }
+    } else {
+      stopVoice() // 非200响应，停止动效
+    }
   } catch (err) {
     console.error('触发入场语音失败:', err)
+    stopVoice() // 网络异常，停止动效
   }
 }
 

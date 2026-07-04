@@ -6,7 +6,6 @@
     </div>
 
     <aside class="z-10 flex w-[280px] flex-col justify-between glass-panel border-y-0 border-l-0">
-      
       <div class="p-8 pb-4">
         <h1 class="text-4xl font-bold tracking-tighter">14:30</h1>
         <p class="text-sm text-gray-400 font-medium mt-1">周四, 10月24日</p>
@@ -28,20 +27,7 @@
           <span>我</span>
         </button>
       </nav>
-
-      <div class="p-6">
-        <div class="flex items-center gap-4 p-4 rounded-3xl bg-gradient-to-r from-ai-start/20 to-ai-end/20 border border-ai-start/30 backdrop-blur-xl">
-          <div class="relative w-11 h-11 flex items-center justify-center rounded-full bg-gradient-to-tr from-ai-start to-ai-end shadow-[0_0_15px_rgba(123,44,191,0.6)]">
-            <div class="absolute inset-0 rounded-full animate-breath border border-white/30"></div>
-            <Mic class="w-5 h-5 text-white absolute z-10" stroke-width="2.5" />
-          </div>
-          <div class="flex-1">
-            <p class="text-sm font-bold text-white/90">AI 教练</p>
-            <p class="text-xs text-white/50 tracking-wider">待机中...</p>
-          </div>
-        </div>
-      </div>
-    </aside>
+      </aside>
 
     <main class="relative z-10 flex-1 p-8 overflow-hidden">
       <div class="h-full w-full rounded-[40px] glass-panel-light relative overflow-hidden">
@@ -52,32 +38,49 @@
         </router-view>
       </div>
     </main>
+    
+    <AIVoiceAssistant :isPlaying="isVoicePlaying" />
 
   </div>
 </template>
 
 <script setup>
-// import LoginScreen from './components/LoginScreen.vue'
-import { Home, Activity, User, Mic, ScanFace } from '@lucide/vue'
-const isVoicePlaying = ref(false)
-const playVoice = (text) => {
-  isVoicePlaying.value = true
-  // 这里写死播放逻辑或调用 TTS 后端，播放结束后设回 false
-  setTimeout(() => { isVoicePlaying.value = false }, 3000) 
-}
-// 通过 provide 注入，让所有子页面都能控制 AI 语音
-provide('playVoice', playVoice)
-</script>
+import { ref, provide } from 'vue'
+import { Home, Activity, User } from '@lucide/vue'
+import AIVoiceAssistant from './components/AIVoiceAssistant.vue'
 
-<template>
-  <AIVoiceAssistant :isPlaying="isVoicePlaying" />
+const isVoicePlaying = ref(false)
+let voiceTimer = null 
+
+// durationSec：允许传入精确的秒数
+const playVoice = (text, durationSec = null) => {
+  isVoicePlaying.value = true
   
-  <router-view v-slot="{ Component }">
-    <transition name="fade" mode="out-in">
-      <component :is="Component" />
-    </transition>
-  </router-view>
-</template>
+  if (voiceTimer) {
+    clearTimeout(voiceTimer)
+  }
+  
+  // 如果后端传了准确时长，则转换为毫秒；如果没有传，给个兜底 10 秒防卡死
+  const timeoutMs = durationSec !== null ? (durationSec * 1000) : 10000
+
+  voiceTimer = setTimeout(() => { 
+    isVoicePlaying.value = false 
+  }, timeoutMs) 
+}
+
+// 新增：强制提前停止动效的方法
+const stopVoice = () => {
+  isVoicePlaying.value = false
+  if (voiceTimer) {
+    clearTimeout(voiceTimer)
+    voiceTimer = null
+  }
+}
+
+// 供全局注入
+provide('playVoice', playVoice)
+provide('stopVoice', stopVoice)
+</script>
 
 <style scoped>
 .fade-enter-active, .fade-leave-active {
