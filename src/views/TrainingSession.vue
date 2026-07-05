@@ -94,7 +94,7 @@ const timeSeriesPayload = ref([])
 // ROS 实时链路（实机模式）
 const rosConn = ref(null)
 const rosConnected = ref(false)
-const rosTopics = reactive({
+const rosTopics = {
   squatControl: null,
   squatState: null,
   squatRepCompleted: null,
@@ -102,7 +102,7 @@ const rosTopics = reactive({
   heartControl: null,
   heartRate: null,
   heartSpo2: null
-})
+}
 
 let fakeTimer = null
 let pollTimer = null
@@ -288,7 +288,11 @@ const connectRosRealtime = (cfg) => {
     rosConn.value = new ROSLIB.Ros({ url: rosbridgeUrl })
     rosConn.value.on('connection', () => {
       rosConnected.value = true
-      bindRosTopics(cfg)
+      try {
+        bindRosTopics(cfg)
+      } catch (error) {
+        console.error('[TrainingSession][ROS] bindRosTopics failed:', error)
+      }
       publishRosControl(true)
       coachTip.value = 'ROS 已连接，正在使用实时数据。'
     })
