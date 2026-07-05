@@ -12,17 +12,27 @@
       </div>
 
       <nav class="flex-1 px-4 py-8 space-y-4">
-        <button class="w-full flex items-center gap-4 px-6 py-5 rounded-2xl bg-white/10 border border-white/5 text-neon-green font-bold text-xl transition-all shadow-lg">
-          <Home class="w-7 h-7" stroke-width="2.5" />
+        <button 
+          @click="$router.push('/home')"
+          class="w-full flex items-center gap-4 px-6 py-5 rounded-2xl font-bold text-xl transition-all"
+          :class="$route.path === '/home' ? 'bg-white/10 border border-white/5 text-neon-green shadow-lg' : 'text-gray-400 hover:bg-white/5 hover:text-white group'"
+        >
+          <Home class="w-7 h-7 transition-colors" :class="$route.path === '/home' ? '' : 'text-gray-500 group-hover:text-neon-green'" :stroke-width="$route.path === '/home' ? 2.5 : 2" />
           <span>主页</span>
         </button>
 
-        <button class="w-full flex items-center gap-4 px-6 py-5 rounded-2xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold text-xl transition-all group">
-          <Activity class="w-7 h-7 text-gray-500 group-hover:text-neon-orange transition-colors" stroke-width="2" />
+        <button 
+          @click="$router.push('/activity')"
+          class="w-full flex items-center gap-4 px-6 py-5 rounded-2xl font-bold text-xl transition-all"
+          :class="$route.path === '/activity' ? 'bg-white/10 border border-white/5 text-neon-orange shadow-lg' : 'text-gray-400 hover:bg-white/5 hover:text-white group'"
+        >
+          <Activity class="w-7 h-7 transition-colors" :class="$route.path === '/activity' ? '' : 'text-gray-500 group-hover:text-neon-orange'" :stroke-width="$route.path === '/activity' ? 2.5 : 2" />
           <span>运动</span>
         </button>
 
-        <button class="w-full flex items-center gap-4 px-6 py-5 rounded-2xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold text-xl transition-all group">
+        <button 
+          class="w-full flex items-center gap-4 px-6 py-5 rounded-2xl text-gray-400 hover:bg-white/5 hover:text-white font-semibold text-xl transition-all group"
+        >
           <User class="w-7 h-7 text-gray-500 group-hover:text-white transition-colors" stroke-width="2" />
           <span>我</span>
         </button>
