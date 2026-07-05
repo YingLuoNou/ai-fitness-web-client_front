@@ -246,9 +246,10 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch, inject } from 'vue'
 import { List, CalendarDays, MousePointerClick, Activity as ActivityIcon, Sparkles, Mic, Send, Loader2, HeartPulse, History, MessageSquare, Zap } from '@lucide/vue'
 import * as echarts from 'echarts' // 引入 ECharts
+import { fetchUserActivities, fetchUserActivityDetail } from '../api/user'
+import { askAi } from '../api/chat'
 
 const playVoice = inject('playVoice')
-const API_BASE_URL = 'http://127.0.0.1:8000'
 
 const viewMode = ref('list')
 const isLoading = ref(false)
@@ -287,15 +288,12 @@ const calendarDays = computed(() => {
 })
 
 const fetchActivities = async () => {
-  const token = localStorage.getItem('auth_token')
   isLoading.value = true
   try {
-    const response = await fetch(`${API_BASE_URL}/api/user/activities/`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-    if (response.ok) {
-      const data = await response.json()
-      activities.value = data.records || []
+    const data = await fetchUserActivities()
+    activities.value = data.records || []
+    if (!selectedRecordId.value && activities.value.length > 0) {
+      selectRecord(activities.value[0].id)
     }
   } catch (err) {
     console.error('获取记录失败', err)
@@ -432,14 +430,8 @@ const handleResize = () => {
 const selectRecord = async (id) => {
   if(!id) return
   selectedRecordId.value = id
-  const token = localStorage.getItem('auth_token')
   try {
-    const response = await fetch(`${API_BASE_URL}/api/user/activities/${id}/`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-    if (response.ok) {
-      selectedRecord.value = await response.json()
-    }
+    selectedRecord.value = await fetchUserActivityDetail(id)
   } catch (err) {
     console.error('获取详情失败', err)
   }
@@ -452,22 +444,10 @@ const sendAiMessage = async (message) => {
   chatInput.value = ''
   isChatting.value = true
   
-  const token = localStorage.getItem('auth_token')
   try {
-    const response = await fetch(`${API_BASE_URL}/api/chat/ask/`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ message: textToSend })
-    })
-
-    if (response.ok) {
-      const data = await response.json()
-      if(playVoice) {
-         playVoice(data.reply)
-      }
+    const data = await askAi(textToSend)
+    if(playVoice) {
+       playVoice(data.reply)
     }
   } catch (err) {
     console.error('Chat 失败', err)

@@ -91,6 +91,7 @@
 
         <div class="grid grid-cols-2 gap-6 h-32">
           <button 
+            @click="router.push('/training-session')"
             :disabled="dashboardData.plan_status.is_completed || dashboardData.plan_status.today_exercises.length === 0"
             class="rounded-[2rem] flex flex-col items-center justify-center group transition-all"
             :class="(dashboardData.plan_status.is_completed || dashboardData.plan_status.today_exercises.length === 0) ? 'bg-white/5 border border-white/10 text-gray-500' : 'btn-neon-primary shadow-[0_0_20px_rgba(50,255,126,0.3)]'"
@@ -99,7 +100,10 @@
             <span class="text-sm font-bold mt-2 tracking-wider group-active:scale-95 transition-transform" :class="(dashboardData.plan_status.is_completed || dashboardData.plan_status.today_exercises.length === 0) ? 'text-gray-600' : 'text-black/60'">AI 指导 & 动作矫正</span>
           </button>
           
-          <button class="bg-white/10 hover:bg-white/20 active:bg-white/5 border border-white/20 rounded-[2rem] flex flex-col items-center justify-center transition-all group shadow-lg">
+          <button
+            @click="router.push('/free-training')"
+            class="bg-white/10 hover:bg-white/20 active:bg-white/5 border border-white/20 rounded-[2rem] flex flex-col items-center justify-center transition-all group shadow-lg"
+          >
             <span class="text-2xl font-bold tracking-widest text-white group-active:scale-95 transition-transform">自由训练</span>
             <span class="text-sm text-gray-400 font-medium mt-2 tracking-wider group-active:scale-95 transition-transform">自选动作，随心记录</span>
           </button>
@@ -113,10 +117,12 @@
 <script setup>
 import { ref, reactive, onMounted, onBeforeUnmount, computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
+import { fetchDashboard } from '../api/user'
+import { playTts } from '../api/train'
 const playVoice = inject('playVoice')
+const stopVoice = inject('stopVoice')
 
 const router = useRouter()
-const API_BASE_URL = 'http://127.0.0.1:8000'
 
 // --- 时钟逻辑 ---
 const currentTime = ref('')
@@ -170,41 +176,23 @@ const getExerciseIcon = (type) => exerciseDict[type]?.icon || '🔥'
 
 // --- 核心方法：拉取数据 ---
 const fetchDashboardData = async () => {
-  const token = localStorage.getItem('auth_token')
-  if (!token) {
-    router.push('/')
-    return
-  }
-
   try {
-    const response = await fetch(`${API_BASE_URL}/api/user/dashboard/`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    })
+    const data = await fetchDashboard()
+    Object.assign(dashboardData, data) // 更新界面
 
-    if (response.ok) {
-      const data = await response.json()
-      Object.assign(dashboardData, data) // 更新界面
-
-      // 数据加载成功后，触发系统硬件语音
-      triggerWelcomeVoice(data.user_info.username, data.plan_status)
-    } else {
-      // Token 失效或其他错误
+    // 数据加载成功后，触发系统硬件语音
+    triggerWelcomeVoice(data.user_info.username, data.plan_status)
+  } catch (err) {
+    console.error('主页拉取数据失败:', err)
+    if (err.status === 401) {
       localStorage.removeItem('auth_token')
       router.push('/')
     }
-  } catch (err) {
-    console.error('主页拉取数据失败:', err)
   }
 }
 
 // --- 核心方法：触发后端直出硬件语音 ---
 const triggerWelcomeVoice = async (username, planStatus) => {
-  const token = localStorage.getItem('auth_token')
-  
   let textToSpeak = ''
   if (planStatus.today_exercises.length === 0) {
     textToSpeak = `欢迎回来，${username}。今天是休息日，好好放松一下肌肉吧。`
@@ -219,42 +207,29 @@ const triggerWelcomeVoice = async (username, planStatus) => {
   const startTime = Date.now() // 记录请求开始时间戳
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/train/tts-play/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}` 
-      },
-      body: JSON.stringify({ 
-        text: textToSpeak,
-        voice: 'zh-CN-YunxiNeural' 
-      })
+    const data = await playTts({
+      text: textToSpeak,
+      voice: 'zh-CN-YunxiNeural'
     })
 
-    if (response.ok) {
-      const data = await response.json()
+    // 2. 接口返回后，计算请求耗掉了多少秒
+    const elapsedSec = ((Date.now() - startTime) / 1000 ) 
+    
+    if (data.duration) {
+      // 计算音频真正的剩余播放时间
+      const remainingSec = data.duration - elapsedSec + 2.5
       
-      // 2. 接口返回后，计算请求耗掉了多少秒
-      const elapsedSec = ((Date.now() - startTime) / 1000 ) 
-      
-      if (data.duration) {
-        // 计算音频真正的剩余播放时间
-        const remainingSec = data.duration - elapsedSec + 2.5
-        
-        if (remainingSec > 0) {
-          // 如果音频还没播完，更新动效定时器，补齐剩余时间
-          playVoice(textToSpeak, remainingSec)
-        } else {
-          // 如果请求耗时超过了音频时长（例如后端的 play_tts_sync 是阻塞播完才返回），直接停止动效
-          stopVoice()
-        }
+      if (remainingSec > 0) {
+        // 如果音频还没播完，更新动效定时器，补齐剩余时间
+        playVoice(textToSpeak, remainingSec)
+      } else {
+        // 如果请求耗时超过了音频时长（例如后端的 play_tts_sync 是阻塞播完才返回），直接停止动效
+        if (stopVoice) stopVoice()
       }
-    } else {
-      stopVoice() // 非200响应，停止动效
     }
   } catch (err) {
     console.error('触发入场语音失败:', err)
-    stopVoice() // 网络异常，停止动效
+    if (stopVoice) stopVoice() // 网络异常，停止动效
   }
 }
 

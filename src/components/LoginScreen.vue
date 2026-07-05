@@ -105,9 +105,8 @@ import { useRouter } from 'vue-router'
 
 import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { User, Lock, ArrowLeft, Loader2, ScanFace } from '@lucide/vue'
+import { loginByAccount, loginByFace } from '../api/auth'
 const router = useRouter()
-
-const API_BASE_URL = 'http://127.0.0.1:8000'
 
 const isPasswordMode = ref(false)
 const isLoading = ref(false)
@@ -171,69 +170,56 @@ const captureAndSendFace = async () => {
   const base64Image = canvas.toDataURL('image/jpeg', 0.8)
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/auth/face-login/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ face_data: base64Image }) // 注意这里的键名与后端保持一致
-    })
-
-    if (response.ok) {
-      const data = await response.json()
+    const data = await loginByFace(base64Image)
       
-      // 核心业务逻辑：通过后端传回的细分 code，改变 UI 的文案和发光颜色
-      switch (data.code) {
-        case 'AUTH_SUCCESS':
-          stopFacePolling()
-          scanStatus.title = '识别成功'
-          scanStatus.desc = `欢迎回来，${data.username}`
-          scanStatus.color = 'text-neon-green'  // 绿色：放行
-          handleLoginSuccess(data.token || data.access)
-          break
-          
-        case 'NO_FACE':
-          scanStatus.title = '靠近即可唤醒...'
-          scanStatus.desc = data.msg            // "未检测到人脸，请面向屏幕"
-          scanStatus.color = 'text-white'       // 白色：常态
-          break
-          
-        case 'TOO_FAR':
-        case 'NOT_FACING':
-          scanStatus.title = '请调整姿态'
-          scanStatus.desc = data.msg            // "请靠近体测一体机摄像头" / "请抬起头，正对屏幕中央"
-          scanStatus.color = 'text-neon-orange' // 橙色：警告用户调整
-          break
-          
-        case 'IMG_ERROR':
-          scanStatus.title = '图像异常'
-          scanStatus.desc = data.msg
-          scanStatus.color = 'text-neon-red'    // 红色：错误
-          break
-          
-        default:
-          scanStatus.title = '识别中...'
-          scanStatus.desc = data.msg || '正在比对人脸特征'
-          scanStatus.color = 'text-white'
-      }
-    } else {
-      // 捕获 HTTP 级错误 (比如 404, 403)
-      const errorData = await response.json().catch(() => ({}))
-      
-      if (response.status === 404) {
-        scanStatus.title = '未匹配到档案'
-        scanStatus.desc = errorData.msg || '请先使用账号登录并绑定人脸'
-        scanStatus.color = 'text-neon-orange'
-      } else if (response.status === 403) {
-        scanStatus.title = '账号异常'
-        scanStatus.desc = errorData.msg || '该账号已被禁用'
-        scanStatus.color = 'text-neon-red'
-      } else {
-        scanStatus.title = '服务异常'
-        scanStatus.desc = errorData.msg || '无法连接到人脸识别服务'
-        scanStatus.color = 'text-neon-red'
-      }
+    // 核心业务逻辑：通过后端传回的细分 code，改变 UI 的文案和发光颜色
+    switch (data.code) {
+      case 'AUTH_SUCCESS':
+        stopFacePolling()
+        scanStatus.title = '识别成功'
+        scanStatus.desc = `欢迎回来，${data.username}`
+        scanStatus.color = 'text-neon-green'  // 绿色：放行
+        handleLoginSuccess(data.token || data.access)
+        break
+        
+      case 'NO_FACE':
+        scanStatus.title = '靠近即可唤醒...'
+        scanStatus.desc = data.msg            // "未检测到人脸，请面向屏幕"
+        scanStatus.color = 'text-white'       // 白色：常态
+        break
+        
+      case 'TOO_FAR':
+      case 'NOT_FACING':
+        scanStatus.title = '请调整姿态'
+        scanStatus.desc = data.msg            // "请靠近体测一体机摄像头" / "请抬起头，正对屏幕中央"
+        scanStatus.color = 'text-neon-orange' // 橙色：警告用户调整
+        break
+        
+      case 'IMG_ERROR':
+        scanStatus.title = '图像异常'
+        scanStatus.desc = data.msg
+        scanStatus.color = 'text-neon-red'    // 红色：错误
+        break
+        
+      default:
+        scanStatus.title = '识别中...'
+        scanStatus.desc = data.msg || '正在比对人脸特征'
+        scanStatus.color = 'text-white'
     }
   } catch (error) {
-    console.warn('Face login poll error:', error)
+    if (error.status === 404) {
+      scanStatus.title = '未匹配到档案'
+      scanStatus.desc = error.data?.msg || '请先使用账号登录并绑定人脸'
+      scanStatus.color = 'text-neon-orange'
+    } else if (error.status === 403) {
+      scanStatus.title = '账号异常'
+      scanStatus.desc = error.data?.msg || '该账号已被禁用'
+      scanStatus.color = 'text-neon-red'
+    } else {
+      scanStatus.title = '服务异常'
+      scanStatus.desc = error.data?.msg || '无法连接到人脸识别服务'
+      scanStatus.color = 'text-neon-red'
+    }
   }
 }
 
@@ -267,25 +253,13 @@ const handleAccountLogin = async () => {
   errorMessage.value = ''
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/auth/login/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: loginForm.username,
-        password: loginForm.password
-      })
+    const data = await loginByAccount({
+      username: loginForm.username,
+      password: loginForm.password
     })
-
-    const data = await response.json()
-
-    if (response.ok) {
-      handleLoginSuccess(data.token || data.access)
-    } else {
-      errorMessage.value = data.detail || data.error || '账号或密码错误，请重试'
-    }
+    handleLoginSuccess(data.token || data.access)
   } catch (error) {
-    console.error('Login error:', error)
-    errorMessage.value = '无法连接到服务器，请检查网络'
+    errorMessage.value = error.message || '无法连接到服务器，请检查网络'
   } finally {
     isLoading.value = false
   }
