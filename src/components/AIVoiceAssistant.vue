@@ -24,6 +24,7 @@
           <span :class="['text-xs tracking-wider transition-colors duration-300 mt-0.5 truncate', isPlaying ? 'text-neon-green font-medium' : 'text-white/50 uppercase']">
             {{ isPlaying ? '说话中...' : '...' }}
           </span>
+          <span v-if="speechText" class="text-xs mt-1 text-white/75 line-clamp-2">{{ speechText }}</span>
         </div>
 
         <div v-if="isPlaying" class="flex items-center gap-[3px] h-6 flex-shrink-0">
@@ -46,6 +47,10 @@ const props = defineProps({
   isPlaying: {
     type: Boolean,
     default: false
+  },
+  speechText: {
+    type: String,
+    default: ''
   }
 })
 </script>

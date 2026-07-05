@@ -64,18 +64,9 @@ import { fetchExercises, startTrainSession } from '../api/train'
 
 const router = useRouter()
 
-const defaultExerciseOptions = [
-  { value: 'squat', label: '深蹲', desc: '下肢力量与稳定性' },
-  { value: 'pushup', label: '俯卧撑', desc: '上肢推力与核心' },
-  { value: 'plank', label: '平板支撑', desc: '核心耐力' },
-  { value: 'jumping_jack', label: '开合跳', desc: '有氧热身' },
-  { value: 'burpee', label: '波比跳', desc: '全身爆发' },
-  { value: 'lunge', label: '弓步蹲', desc: '单侧稳定与臀腿' }
-]
+const exerciseOptions = ref([])
 
-const exerciseOptions = ref(defaultExerciseOptions)
-
-const selectedExercises = ref(['squat'])
+const selectedExercises = ref([])
 
 const form = reactive({
   sets: 3,
@@ -98,20 +89,37 @@ const toggleExercise = (value) => {
 }
 
 const startTraining = async () => {
+  if (exerciseOptions.value.length === 0) {
+    status.type = 'error'
+    status.text = '当前没有可用动作，请先在 ros_runtime.yaml 的 action_detectors 中启用动作'
+    return
+  }
+
   if (selectedExercises.value.length === 0) {
     status.type = 'error'
     status.text = '请至少选择一个动作'
     return
   }
 
+  const normalizedSets = Math.max(1, Math.min(10, Number(form.sets) || 1))
+  const normalizedReps = Math.max(1, Math.min(100, Number(form.reps) || 1))
+  const normalizedRestSeconds = Math.max(10, Math.min(300, Number(form.restSeconds) || 30))
+
+  form.sets = normalizedSets
+  form.reps = normalizedReps
+  form.restSeconds = normalizedRestSeconds
+
   isSubmitting.value = true
   const payload = {
     mode: 'free',
-    exercises: selectedExercises.value.map((item) => (item === 'push_up' ? 'pushup' : item)),
-    sets: form.sets,
-    reps: form.reps,
-    restSec: form.restSeconds,
-    rest_seconds: form.restSeconds
+    exercises: selectedExercises.value,
+    sets: normalizedSets,
+    reps: normalizedReps,
+    reps_per_set: normalizedReps,
+    restSec: normalizedRestSeconds,
+    rest_sec: normalizedRestSeconds,
+    rest_seconds: normalizedRestSeconds,
+    intensity: 'medium'
   }
 
   try {
@@ -122,7 +130,10 @@ const startTraining = async () => {
     router.push({
       path: '/training-session',
       query: {
-        sessionId: data.session_id || data.id || ''
+        sessionId: data.session_id || data.id || '',
+        sets: String(normalizedSets),
+        reps: String(normalizedReps),
+        restSec: String(normalizedRestSeconds)
       }
     })
   } catch (error) {
@@ -136,19 +147,28 @@ const startTraining = async () => {
 const hydrateExercises = async () => {
   try {
     const data = await fetchExercises()
-    if (!Array.isArray(data.exercises) || data.exercises.length === 0) return
+    if (!Array.isArray(data.exercises) || data.exercises.length === 0) {
+      exerciseOptions.value = []
+      selectedExercises.value = []
+      status.type = 'error'
+      status.text = '未检测到已启用动作，请检查后端动作识别配置'
+      return
+    }
 
     exerciseOptions.value = data.exercises.map((item) => ({
       value: item.code,
-      label: item.name,
+      label: item.name_zh || item.name || item.code,
       desc: item.desc || '标准训练动作'
     }))
 
-    if (!selectedExercises.value.length && exerciseOptions.value.length > 0) {
-      selectedExercises.value = [exerciseOptions.value[0].value]
-    }
+    selectedExercises.value = [exerciseOptions.value[0].value]
+    status.type = 'ok'
+    status.text = `已加载 ${exerciseOptions.value.length} 个可用动作`
   } catch (error) {
-    exerciseOptions.value = defaultExerciseOptions
+    exerciseOptions.value = []
+    selectedExercises.value = []
+    status.type = 'error'
+    status.text = '动作配置读取失败，请检查后端服务与配置文件'
   }
 }
 

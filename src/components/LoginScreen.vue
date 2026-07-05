@@ -44,56 +44,216 @@
 
     <canvas ref="canvasRef" class="hidden"></canvas>
 
+    <!-- 注册弹窗 -->
+    <div v-if="isRegisterOpen" class="fixed inset-0 z-60 flex items-center justify-center bg-black/70 backdrop-blur-md p-6" @click.self="closeRegister">
+      <div class="w-[760px] max-w-[95vw] max-h-[90vh] overflow-auto rounded-[2rem] p-8 glass-panel-light border border-white/15 shadow-[0_30px_80px_rgba(0,0,0,.55)]">
+        <div class="flex items-start justify-between gap-4 mb-6">
+          <div>
+            <p class="text-xs tracking-[0.32em] text-neon-green/90 uppercase">AI Fitness Onboarding</p>
+            <h3 class="text-3xl font-bold mt-2">创建新账号</h3>
+            <p class="text-gray-400 mt-2">共 3 步，约 30 秒完成初始化</p>
+          </div>
+          <button @click="closeRegister" class="w-11 h-11 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-xl">✕</button>
+        </div>
+
+        <div class="mb-7">
+          <div class="flex items-center gap-3">
+            <template v-for="step in regSteps" :key="step.id">
+              <div class="flex items-center gap-3 flex-1">
+                <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border transition-all"
+                  :class="step.id <= regStep ? 'bg-neon-green text-black border-neon-green shadow-[0_0_18px_rgba(50,255,126,.45)]' : 'bg-white/5 text-gray-400 border-white/20'">
+                  {{ step.id }}
+                </div>
+                <div class="text-sm" :class="step.id <= regStep ? 'text-white' : 'text-gray-500'">{{ step.title }}</div>
+              </div>
+            </template>
+          </div>
+          <div class="h-1.5 mt-4 rounded-full bg-white/10 overflow-hidden">
+            <div class="h-full bg-gradient-to-r from-neon-green to-ai-end transition-all duration-500" :style="{ width: `${(regStep / 3) * 100}%` }"></div>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div v-if="regStep === 1" class="space-y-4">
+            <p class="text-sm text-gray-400">步骤 1 / 3 · 创建账号</p>
+
+            <div>
+              <label class="block text-sm text-gray-300 mb-2">用户名</label>
+              <input v-model.trim="registerForm.username" placeholder="请输入用户名" class="w-full h-13 rounded-xl px-4 bg-white/5 border border-white/10 focus:border-neon-green/80 focus:bg-white/10 outline-none transition-all" />
+            </div>
+
+            <div>
+              <label class="block text-sm text-gray-300 mb-2">密码</label>
+              <input v-model="registerForm.password" type="password" placeholder="请输入密码（建议 6 位以上）" class="w-full h-13 rounded-xl px-4 bg-white/5 border border-white/10 focus:border-neon-green/80 focus:bg-white/10 outline-none transition-all" />
+            </div>
+
+            <p class="text-xs text-gray-500">账号用于密码登录，人脸功能可在登录后补充录入。</p>
+
+            <div class="flex justify-end gap-3 pt-2">
+              <button @click="closeRegister" class="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all">取消</button>
+              <button @click="nextRegStep" :disabled="!canStep1" class="px-7 py-2.5 rounded-xl font-semibold transition-all"
+                :class="canStep1 ? 'btn-neon-primary' : 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/10'">
+                下一步
+              </button>
+            </div>
+          </div>
+
+          <div v-else-if="regStep === 2" class="space-y-4">
+            <p class="text-sm text-gray-400">步骤 2 / 3 · 个人信息</p>
+
+            <div>
+              <label class="block text-sm text-gray-300 mb-2">性别</label>
+              <div class="grid grid-cols-2 gap-3">
+                <button type="button" @click="registerForm.gender='M'" :aria-pressed="registerForm.gender==='M'"
+                  :class="registerForm.gender==='M' ? 'bg-neon-green text-black border-neon-green' : 'bg-white/5 text-white border-white/10 hover:bg-white/10'"
+                  class="h-12 rounded-xl border text-base font-medium transition-all">男</button>
+                <button type="button" @click="registerForm.gender='F'" :aria-pressed="registerForm.gender==='F'"
+                  :class="registerForm.gender==='F' ? 'bg-neon-green text-black border-neon-green' : 'bg-white/5 text-white border-white/10 hover:bg-white/10'"
+                  class="h-12 rounded-xl border text-base font-medium transition-all">女</button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm text-gray-300 mb-2">身高（cm）</label>
+                <input v-model.number="registerForm.height" type="number" min="80" max="260" placeholder="例如 170" class="w-full h-12 rounded-xl px-3 bg-white/5 border border-white/10 focus:border-neon-green/80 outline-none transition-all" />
+              </div>
+              <div>
+                <label class="block text-sm text-gray-300 mb-2">体重（kg）</label>
+                <input v-model.number="registerForm.weight" type="number" min="20" max="300" placeholder="例如 65" class="w-full h-12 rounded-xl px-3 bg-white/5 border border-white/10 focus:border-neon-green/80 outline-none transition-all" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm text-gray-300 mb-2">出生日期（可选）</label>
+              <div class="rounded-xl border border-white/10 bg-white/5 p-2">
+                <div class="relative">
+                  <input ref="birthInput" v-model="registerForm.birthdate" type="date" :max="today" class="w-full h-12 rounded-lg px-3 pr-14 bg-black/20 border border-white/10 focus:border-neon-green/80 outline-none transition-all text-white" />
+                  <button type="button" @click="focusBirth" class="absolute right-1.5 top-1/2 -translate-y-1/2 w-10 h-10 rounded-lg bg-white/8 border border-white/15 text-white hover:bg-white/12 flex items-center justify-center transition-all">
+                    <Calendar class="w-5 h-5" />
+                  </button>
+                </div>
+                <div class="grid grid-cols-3 gap-2 mt-2">
+                  <button type="button" @click="setBirthByAge(18)" class="h-9 rounded-lg bg-white/5 border border-white/10 text-xs text-gray-200 hover:bg-white/10 transition-all">18岁</button>
+                  <button type="button" @click="setBirthByAge(25)" class="h-9 rounded-lg bg-white/5 border border-white/10 text-xs text-gray-200 hover:bg-white/10 transition-all">25岁</button>
+                  <button type="button" @click="setBirthByAge(30)" class="h-9 rounded-lg bg-white/5 border border-white/10 text-xs text-gray-200 hover:bg-white/10 transition-all">30岁</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex justify-between gap-3 pt-2">
+              <button @click="prevRegStep" class="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all">上一步</button>
+              <button @click="nextRegStep" :disabled="!canStep2" class="px-7 py-2.5 rounded-xl font-semibold transition-all"
+                :class="canStep2 ? 'btn-neon-primary' : 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/10'">
+                下一步
+              </button>
+            </div>
+          </div>
+
+          <div v-else-if="regStep === 3" class="space-y-4">
+            <p class="text-sm text-gray-400">步骤 3 / 3 · 目标与确认</p>
+
+            <div>
+              <label class="block text-sm text-gray-300 mb-2">健身目标（单选）</label>
+              <div class="grid grid-cols-2 gap-3">
+                <button
+                  v-for="goal in goalOptions"
+                  :key="goal"
+                  type="button"
+                  @click="registerForm.goal = goal"
+                  :aria-pressed="registerForm.goal === goal"
+                  class="h-12 rounded-xl border px-3 text-sm font-medium transition-all text-left"
+                  :class="registerForm.goal === goal ? 'bg-neon-green text-black border-neon-green shadow-[0_0_18px_rgba(50,255,126,.35)]' : 'bg-white/5 text-white border-white/10 hover:bg-white/10'"
+                >
+                  {{ goal }}
+                </button>
+              </div>
+              <input v-if="registerForm.goal==='其他'" v-model.trim="registerForm.customGoal" placeholder="请输入自定义目标" class="w-full h-12 rounded-xl px-3 bg-white/5 border border-white/10 focus:border-neon-green/80 outline-none mt-3 text-white" />
+            </div>
+
+            <div class="mt-4 p-4 bg-black/25 rounded-xl border border-white/10">
+              <p class="text-sm text-gray-300 mb-3">请确认以下信息</p>
+              <div class="grid grid-cols-2 gap-y-2 text-sm">
+                <p class="text-gray-400">用户名</p><p class="text-white">{{ registerForm.username }}</p>
+                <p class="text-gray-400">性别</p><p class="text-white">{{ registerForm.gender === 'M' ? '男' : '女' }}</p>
+                <p class="text-gray-400">出生日期</p><p class="text-white">{{ registerForm.birthdate || '--' }}</p>
+                <p class="text-gray-400">身高 / 体重</p><p class="text-white">{{ registerForm.height }} cm / {{ registerForm.weight }} kg</p>
+                <p class="text-gray-400">目标</p><p class="text-white">{{ finalGoal }}</p>
+              </div>
+            </div>
+
+            <p v-if="registerError" class="text-neon-red mt-2">{{ registerError }}</p>
+            <div class="flex justify-between gap-3 pt-2">
+              <button @click="prevRegStep" class="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all">上一步</button>
+              <button @click="handleRegister" :disabled="submitRegisterDisabled" class="px-7 py-2.5 rounded-xl font-semibold transition-all"
+                :class="submitRegisterDisabled ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/10' : 'btn-neon-primary'">
+                <span v-if="registerLoading">创建中...</span>
+                <span v-else>创建并登录</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
 
     <div 
-      class="absolute right-24 w-[500px] glass-panel p-12 rounded-[3rem] flex flex-col transition-all duration-700 ease-[cubic-bezier(0.2,0.8,0.2,1)] z-50 shadow-2xl"
+      class="absolute right-24 w-[560px] max-w-[42vw] glass-panel-light border border-white/15 p-10 rounded-[2rem] flex flex-col transition-all duration-700 ease-[cubic-bezier(0.2,0.8,0.2,1)] z-50 shadow-[0_30px_80px_rgba(0,0,0,.5)]"
       :class="isPasswordMode ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-32 pointer-events-none'"
     >
-      <div class="flex items-center justify-between mb-10">
-        <h3 class="text-3xl font-bold tracking-widest text-white">系统登录</h3>
-        <button @click="switchMode(false)" class="p-3 rounded-full hover:bg-white/10 active:bg-white/20 text-gray-400 transition-all border border-transparent hover:border-white/10">
+      <div class="flex items-start justify-between mb-8 gap-4">
+        <div>
+          <p class="text-xs tracking-[0.32em] text-neon-green/90 uppercase">AI Fitness Access</p>
+          <h3 class="text-3xl font-bold mt-2 text-white">系统登录</h3>
+          <p class="text-gray-400 mt-2">使用账号密码进入训练系统</p>
+        </div>
+        <button @click="switchMode(false)" class="w-11 h-11 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-gray-300 flex items-center justify-center">
           <ArrowLeft class="w-8 h-8" />
         </button>
       </div>
       
-      <form @submit.prevent="handleAccountLogin" class="space-y-8">
-        <div class="space-y-3">
-          <label class="text-lg text-gray-400 font-medium pl-3 tracking-wider">用户名 USERNAME</label>
+      <form @submit.prevent="handleAccountLogin" class="space-y-6">
+        <div class="space-y-2">
+          <label class="block text-sm text-gray-300">用户名</label>
           <div class="relative flex items-center">
-            <User class="w-8 h-8 text-gray-400 absolute left-5" />
+            <User class="w-5 h-5 text-gray-400 absolute left-4" />
             <input 
               v-model="loginForm.username" 
               type="text" 
-              placeholder="请输入管理员账号"
-              class="w-full h-20 bg-white/5 border-2 border-white/10 rounded-3xl pl-16 pr-6 text-2xl text-white outline-none focus:border-neon-green focus:bg-white/10 transition-all shadow-inner"
+              placeholder="请输入用户名"
+              class="w-full h-12 bg-white/5 border border-white/10 rounded-xl pl-12 pr-4 text-base text-white outline-none focus:border-neon-green/80 focus:bg-white/10 transition-all"
             >
           </div>
         </div>
 
-        <div class="space-y-3">
-          <label class="text-lg text-gray-400 font-medium pl-3 tracking-wider">密码 PASSWORD</label>
+        <div class="space-y-2">
+          <label class="block text-sm text-gray-300">密码</label>
           <div class="relative flex items-center">
-            <Lock class="w-8 h-8 text-gray-400 absolute left-5" />
+            <Lock class="w-5 h-5 text-gray-400 absolute left-4" />
             <input 
               v-model="loginForm.password" 
               type="password" 
               placeholder="请输入密码"
-              class="w-full h-20 bg-white/5 border-2 border-white/10 rounded-3xl pl-16 pr-6 text-2xl text-white outline-none focus:border-neon-green focus:bg-white/10 transition-all shadow-inner"
+              class="w-full h-12 bg-white/5 border border-white/10 rounded-xl pl-12 pr-4 text-base text-white outline-none focus:border-neon-green/80 focus:bg-white/10 transition-all"
             >
           </div>
         </div>
 
-        <p v-if="errorMessage" class="text-neon-red text-lg font-medium pl-3 h-6">{{ errorMessage }}</p>
+        <p v-if="errorMessage" class="text-neon-red text-sm h-5">{{ errorMessage }}</p>
 
         <button 
           type="submit"
           :disabled="isLoading"
-          class="w-full mt-6 py-6 rounded-3xl text-2xl font-bold tracking-widest transition-all duration-300 flex justify-center items-center gap-3 shadow-lg"
-          :class="(loginForm.username && loginForm.password) ? 'btn-neon-primary' : 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5'"
+          class="w-full mt-2 py-3 rounded-xl text-base font-semibold transition-all duration-300 flex justify-center items-center gap-2"
+          :class="(loginForm.username && loginForm.password) ? 'btn-neon-primary' : 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/10'"
         >
-          <Loader2 v-if="isLoading" class="w-8 h-8 animate-spin" />
+          <Loader2 v-if="isLoading" class="w-5 h-5 animate-spin" />
           {{ isLoading ? '登录中...' : '进入系统' }}
         </button>
+        <div class="pt-1 flex justify-between items-center text-sm">
+          <button type="button" @click="openRegister" class="text-gray-300 hover:text-white transition-all">没有账号？去注册</button>
+          <a href="#" class="text-gray-400 hover:text-white transition-all">忘记密码</a>
+        </div>
       </form>
     </div>
 
@@ -103,9 +263,10 @@
 <script setup>
 import { useRouter } from 'vue-router'
 
-import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
-import { User, Lock, ArrowLeft, Loader2, ScanFace } from '@lucide/vue'
-import { loginByAccount, loginByFace } from '../api/auth'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { User, Lock, ArrowLeft, Loader2, ScanFace, Calendar } from '@lucide/vue'
+import { loginByAccount, loginByFace, registerAccount } from '../api/auth'
+import { initGeneratePlan } from '../api/train'
 const router = useRouter()
 
 const isPasswordMode = ref(false)
@@ -179,7 +340,7 @@ const captureAndSendFace = async () => {
         scanStatus.title = '识别成功'
         scanStatus.desc = `欢迎回来，${data.username}`
         scanStatus.color = 'text-neon-green'  // 绿色：放行
-        handleLoginSuccess(data.token || data.access)
+        handleLoginSuccess(data.access)
         break
         
       case 'NO_FACE':
@@ -246,6 +407,143 @@ const switchMode = (isPassword) => {
   }
 }
 
+// 注册弹窗与逻辑
+const isRegisterOpen = ref(false)
+const registerLoading = ref(false)
+const registerError = ref('')
+const registerForm = reactive({
+  username: '',
+  password: '',
+  gender: 'M',
+  height: 170,
+  weight: 65,
+  birthdate: '',
+  goal: '减脂塑形',
+  customGoal: ''
+})
+const today = new Date().toISOString().slice(0, 10)
+const birthInput = ref(null)
+const regSteps = [
+  { id: 1, title: '账号' },
+  { id: 2, title: '身体信息' },
+  { id: 3, title: '目标确认' }
+]
+const goalOptions = ['减脂塑形', '增肌', '提升耐力', '增强柔韧性', '其他']
+
+const canStep1 = computed(() => {
+  return registerForm.username.trim().length >= 2 && registerForm.password.length >= 6
+})
+
+const canStep2 = computed(() => {
+  const h = Number(registerForm.height)
+  const w = Number(registerForm.weight)
+  return Number.isFinite(h) && Number.isFinite(w) && h >= 80 && h <= 260 && w >= 20 && w <= 300
+})
+
+const finalGoal = computed(() => {
+  if (registerForm.goal === '其他') {
+    return registerForm.customGoal.trim()
+  }
+  return registerForm.goal
+})
+
+const submitRegisterDisabled = computed(() => {
+  return registerLoading.value || !finalGoal.value
+})
+
+const focusBirth = () => {
+  if (birthInput.value) birthInput.value.showPicker?.() || birthInput.value.focus()
+}
+
+const setBirthByAge = (age) => {
+  const d = new Date()
+  d.setFullYear(d.getFullYear() - age)
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  registerForm.birthdate = `${yyyy}-${mm}-${dd}`
+}
+const regStep = ref(1)
+
+const resetRegisterForm = () => {
+  registerForm.username = ''
+  registerForm.password = ''
+  registerForm.gender = 'M'
+  registerForm.height = 170
+  registerForm.weight = 65
+  registerForm.birthdate = ''
+  registerForm.goal = '减脂塑形'
+  registerForm.customGoal = ''
+}
+
+const nextRegStep = () => {
+  if (regStep.value === 1 && !canStep1.value) {
+    registerError.value = '请输入至少 2 位用户名和 6 位密码'
+    return
+  }
+  if (regStep.value === 2 && !canStep2.value) {
+    registerError.value = '请填写合理的身高与体重范围'
+    return
+  }
+  registerError.value = ''
+  if (regStep.value < 3) regStep.value += 1
+}
+
+const prevRegStep = () => {
+  registerError.value = ''
+  if (regStep.value > 1) regStep.value -= 1
+}
+
+const openRegister = () => {
+  isRegisterOpen.value = true
+  regStep.value = 1
+  registerError.value = ''
+  resetRegisterForm()
+  // 停止摄像头与人脸轮询，避免弹窗被视频/扫描逻辑干扰
+  stopFacePolling()
+  stopCamera()
+}
+
+const closeRegister = () => {
+  isRegisterOpen.value = false
+  registerError.value = ''
+  // 恢复摄像头轮询（若非密码模式）
+  if (!isPasswordMode.value) startCamera()
+  if (!isPasswordMode.value) startFacePolling()
+}
+
+const handleRegister = async () => {
+  if (!canStep1.value || !canStep2.value || !finalGoal.value) {
+    registerError.value = '请先完整填写注册信息'
+    return
+  }
+  registerLoading.value = true
+  registerError.value = ''
+  try {
+    const data = await registerAccount({
+      username: registerForm.username,
+      password: registerForm.password,
+      gender: registerForm.gender,
+      height: registerForm.height,
+      weight: registerForm.weight,
+      birthdate: registerForm.birthdate,
+      goal: finalGoal.value
+    })
+    // 直接登录并静默调用初始计划生成接口
+    handleLoginSuccess(data.access)
+    try {
+      await initGeneratePlan({ goal: finalGoal.value })
+    } catch (e) {
+      // 生成计划失败不阻塞登录流程
+    }
+    closeRegister()
+  } catch (err) {
+    registerError.value = err.data?.error || err.message || '注册失败'
+  } finally {
+    registerLoading.value = false
+  }
+}
+
 const handleAccountLogin = async () => {
   if (!loginForm.username || !loginForm.password) return
   
@@ -257,7 +555,7 @@ const handleAccountLogin = async () => {
       username: loginForm.username,
       password: loginForm.password
     })
-    handleLoginSuccess(data.token || data.access)
+    handleLoginSuccess(data.access)
   } catch (error) {
     errorMessage.value = error.message || '无法连接到服务器，请检查网络'
   } finally {
@@ -268,6 +566,7 @@ const handleAccountLogin = async () => {
 const handleLoginSuccess = (token) => {
   if (token) {
     localStorage.setItem('auth_token', token)
+    sessionStorage.setItem('welcome_voice_pending', '1')
     // 延迟 800ms，让用户看清楚“识别成功”的绿色字样，然后再丝滑切走
     setTimeout(() => {
       router.push('/home')
@@ -305,4 +604,26 @@ onBeforeUnmount(() => {
 .animate-scan {
   animation: scan 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
+
+/* 注册向导触屏优化样式 */
+.btn-neon-primary {
+  background: linear-gradient(90deg, #00FFA3, #32FF7E);
+  color: #021;
+}
+
+.bg-neon-green { background-color: #32FF7E; }
+
+/* 输入和选择文字颜色保证可见 */
+select, input[type="text"], input[type="date"], input[type="number"], textarea {
+  color: #fff;
+}
+
+.bg-white\/6 { background-color: rgba(255,255,255,0.06); }
+
+/* 确保原生下拉项可见（部分浏览器支持） */
+select option {
+  color: #000;
+  background: #fff;
+}
+
 </style>

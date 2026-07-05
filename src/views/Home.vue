@@ -11,6 +11,10 @@
       </div>
     </header>
 
+    <div v-if="statusMessage.text" class="mb-4 px-6 py-3 rounded-lg" :class="statusMessage.type === 'error' ? 'bg-neon-red/10 text-neon-red' : (statusMessage.type === 'warning' ? 'bg-neon-orange/10 text-neon-orange' : 'bg-neon-green/10 text-neon-green')">
+      {{ statusMessage.text }}
+    </div>
+
     <div class="flex-1 grid grid-cols-12 gap-8 h-full pb-6">
       
       <div class="col-span-5 glass-panel rounded-[2rem] flex flex-col items-center justify-center relative shadow-2xl p-6 overflow-hidden">
@@ -91,8 +95,8 @@
 
         <div class="grid grid-cols-2 gap-6 h-32">
           <button 
-            @click="router.push('/training-session')"
-            :disabled="dashboardData.plan_status.is_completed || dashboardData.plan_status.today_exercises.length === 0"
+            @click="startTodayPlan"
+            :disabled="isStartingPlan || dashboardData.plan_status.is_completed || dashboardData.plan_status.today_exercises.length === 0"
             class="rounded-[2rem] flex flex-col items-center justify-center group transition-all"
             :class="(dashboardData.plan_status.is_completed || dashboardData.plan_status.today_exercises.length === 0) ? 'bg-white/5 border border-white/10 text-gray-500' : 'btn-neon-primary shadow-[0_0_20px_rgba(50,255,126,0.3)]'"
           >
@@ -118,11 +122,12 @@
 import { ref, reactive, onMounted, onBeforeUnmount, computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { fetchDashboard } from '../api/user'
-import { playTts } from '../api/train'
+import { fetchExercises, playTts, startTrainSession } from '../api/train'
 const playVoice = inject('playVoice')
 const stopVoice = inject('stopVoice')
 
 const router = useRouter()
+const WELCOME_VOICE_PENDING_KEY = 'welcome_voice_pending'
 
 // --- 时钟逻辑 ---
 const currentTime = ref('')
@@ -135,7 +140,7 @@ const updateTime = () => {
 
 // --- 数据模型 ---
 const dashboardData = reactive({
-  user_info: { username: '用户', gender: 'O', height: 170, weight: 65 },
+  user_info: { username: '用户', gender: '', height: 170, weight: 65 },
   weekly_duration_mins: 0,
   plan_status: {
     active_plan_id: null,
@@ -144,6 +149,9 @@ const dashboardData = reactive({
     today_exercises: []
   }
 })
+
+const isStartingPlan = ref(false)
+const statusMessage = reactive({ type: 'ok', text: '' })
 
 // --- 动态计算 BMI ---
 const bmiValue = computed(() => {
@@ -163,16 +171,37 @@ const bmiStatusColor = computed(() => {
   return 'text-neon-red' // 偏胖
 })
 
-// --- 动作字典翻译 ---
-const exerciseDict = {
-  squat: { name: '深蹲', icon: '🦵' },
-  push_up: { name: '俯卧撑', icon: '💪' },
-  pull_up: { name: '引体向上', icon: '🦍' },
-  plank: { name: '平板支撑', icon: '🧱' },
-  jumping_jack: { name: '开合跳', icon: '🏃' }
+// --- 动作字典翻译（从配置API读取，避免硬编码） ---
+const exerciseDict = ref({})
+const exerciseIconFallback = {
+  squat: '🦵',
+  pushup: '💪',
+  push_up: '💪',
+  pull_up: '🦍',
+  plank: '🧱',
+  jumping_jack: '🏃'
 }
-const getExerciseName = (type) => exerciseDict[type]?.name || type
-const getExerciseIcon = (type) => exerciseDict[type]?.icon || '🔥'
+const getExerciseName = (type) => exerciseDict.value[type]?.name || type
+const getExerciseIcon = (type) => exerciseIconFallback[type] || '🔥'
+
+const hydrateExerciseDict = async () => {
+  try {
+    const data = await fetchExercises()
+    const dict = {}
+    const list = Array.isArray(data?.exercises) ? data.exercises : []
+    for (const item of list) {
+      const code = String(item?.code || '').trim()
+      if (!code) continue
+      dict[code] = {
+        name: item?.name_zh || item?.name || code
+      }
+    }
+    exerciseDict.value = dict
+  } catch (err) {
+    console.warn('读取动作字典失败，使用类型原文显示', err)
+    exerciseDict.value = {}
+  }
+}
 
 // --- 核心方法：拉取数据 ---
 const fetchDashboardData = async () => {
@@ -180,14 +209,58 @@ const fetchDashboardData = async () => {
     const data = await fetchDashboard()
     Object.assign(dashboardData, data) // 更新界面
 
-    // 数据加载成功后，触发系统硬件语音
-    triggerWelcomeVoice(data.user_info.username, data.plan_status)
+    const username = data?.user_info?.username || '用户'
+    const shouldPlayWelcome = sessionStorage.getItem(WELCOME_VOICE_PENDING_KEY) === '1'
+    if (shouldPlayWelcome) {
+      await triggerWelcomeVoice(username, data.plan_status)
+      sessionStorage.removeItem(WELCOME_VOICE_PENDING_KEY)
+    }
   } catch (err) {
     console.error('主页拉取数据失败:', err)
     if (err.status === 401) {
       localStorage.removeItem('auth_token')
       router.push('/')
     }
+  }
+}
+
+const startTodayPlan = async () => {
+  if (isStartingPlan.value) return
+  if (!dashboardData.plan_status || !dashboardData.plan_status.today_exercises || dashboardData.plan_status.today_exercises.length === 0) return
+  isStartingPlan.value = true
+  try {
+    const exercises = dashboardData.plan_status.today_exercises.map(e => e.type)
+    // pick reasonable defaults from first exercise
+    const first = dashboardData.plan_status.today_exercises[0] || {}
+    const sets = first.sets || 1
+    const reps = first.reps_per_set || Math.max(1, Math.floor((first.target || 0) / (sets || 1)))
+
+    const payload = {
+      mode: 'guided',
+      exercises,
+      sets,
+      reps,
+      restSec: 45,
+      intensity: 'medium'
+    }
+
+    const data = await startTrainSession(payload)
+    const sessionId = data.session_id || data.id || ''
+    if (sessionId) {
+      statusMessage.type = 'ok'
+      statusMessage.text = '训练会话已创建，跳转中...'
+      router.push({ path: '/training-session', query: { sessionId, sets: String(sets), reps: String(reps) } })
+    } else {
+      statusMessage.type = 'warning'
+      statusMessage.text = '会话创建失败，使用本地训练页'
+      router.push('/training-session')
+    }
+  } catch (err) {
+    console.error('启动今日计划失败', err)
+    statusMessage.type = 'error'
+    statusMessage.text = '启动计划失败，请稍后再试'
+  } finally {
+    isStartingPlan.value = false
   }
 }
 
@@ -236,6 +309,7 @@ const triggerWelcomeVoice = async (username, planStatus) => {
 onMounted(() => {
   updateTime()
   timeInterval = setInterval(updateTime, 1000)
+  hydrateExerciseDict()
   fetchDashboardData() // 进入页面即拉取
 })
 

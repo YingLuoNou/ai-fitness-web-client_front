@@ -102,15 +102,9 @@
                 <p class="text-lg font-semibold mt-2" :class="faceStatusClass">{{ faceFeedback.title }}</p>
                 <p class="text-sm text-gray-300 mt-2">{{ faceFeedback.desc }}</p>
               </div>
-              <div class="text-xs text-gray-500 mt-4">
-                按接口 `code` 分支：`ENROLL_SUCCESS` 视为成功；`NO_FACE/TOO_FAR/NOT_FACING` 为姿态提示；`IMG_ERROR` 为画面异常。
-              </div>
+              <div class="text-xs text-gray-500 mt-4">请保持光线充足并正对镜头</div>
             </div>
           </div>
-        </div>
-
-        <div class="mt-auto bg-black/25 border border-white/10 rounded-2xl p-4 text-sm text-gray-300">
-          提示：接口字段为空时页面仅显示 `--`，不会伪造默认信息。
         </div>
       </div>
     </section>

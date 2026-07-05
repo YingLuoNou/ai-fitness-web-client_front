@@ -25,11 +25,23 @@ export const fetchTrainSessionState = (sessionId) => {
   })
 }
 
-export const finishTrainSession = (sessionId, reason = 'user_finish') => {
+export const ingestTrainSessionRealtime = (sessionId, payload = {}) => {
+  return request(`/api/train/session/${sessionId}/ingest/`, {
+    method: 'POST',
+    auth: true,
+    body: payload
+  })
+}
+
+export const finishTrainSession = (sessionId, payload = {}) => {
+  const reason = payload?.reason || 'user_finish'
   return request(`/api/train/session/${sessionId}/finish/`, {
     method: 'POST',
     auth: true,
-    body: { reason }
+    body: {
+      reason,
+      ...payload
+    }
   })
 }
 
@@ -44,5 +56,13 @@ export const finishTraining = (payload) => {
 export const pollTrainStatus = (activityId) => {
   return request(`/api/train/status/${activityId}/`, {
     auth: true
+  })
+}
+
+export const initGeneratePlan = (payload) => {
+  return request('/api/plan/init-generate/', {
+    method: 'POST',
+    auth: true,
+    body: payload
   })
 }

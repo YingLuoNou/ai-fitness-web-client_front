@@ -21,3 +21,10 @@ export const registerFace = (faceData) => {
     body: { face_data: faceData }
   })
 }
+
+export const registerAccount = (payload) => {
+  return request('/api/auth/register/', {
+    method: 'POST',
+    body: payload
+  })
+}
