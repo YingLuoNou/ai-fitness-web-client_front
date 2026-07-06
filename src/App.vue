@@ -67,7 +67,13 @@
         </div>
       </main>
 
-      <AIVoiceAssistant :isPlaying="isVoicePlaying" :speechText="voiceDisplayText" />
+      <AIVoiceAssistant
+        :isPlaying="isVoicePlaying"
+        :speechText="voiceDisplayText"
+        :isVisible="voiceBubbleVisible"
+        :isExpanded="voiceBubbleExpanded"
+        @toggleExpand="toggleVoiceBubbleExpand"
+      />
     </template>
 
   </div>
@@ -105,6 +111,8 @@ const isVoicePlaying = ref(false)
 let voiceTimer = null 
 const voiceDisplayText = ref('')
 let voiceStreamTimer = null
+const voiceBubbleVisible = ref(false)
+const voiceBubbleExpanded = ref(false)
 
 const clearVoiceStream = () => {
   if (voiceStreamTimer) {
@@ -146,11 +154,31 @@ const handleUserActivity = () => {
   resetIdleTimer()
 }
 
+const handleGlobalPointerDown = (event) => {
+  resetIdleTimer()
+  const target = event?.target
+  if (target && typeof target.closest === 'function' && target.closest('[data-voice-bubble-root]')) {
+    return
+  }
+
+  voiceBubbleExpanded.value = false
+  if (!isVoicePlaying.value) {
+    voiceBubbleVisible.value = false
+  }
+}
+
+const toggleVoiceBubbleExpand = () => {
+  if (!voiceBubbleVisible.value) return
+  voiceBubbleExpanded.value = !voiceBubbleExpanded.value
+}
+
 // durationSec：允许传入精确的秒数
 const playVoice = (text, durationSec = null) => {
   isVoicePlaying.value = true
   const safeText = typeof text === 'string' ? text : ''
   voiceDisplayText.value = ''
+  voiceBubbleVisible.value = true
+  voiceBubbleExpanded.value = false
 
   clearVoiceStream()
   let index = 0
@@ -170,7 +198,8 @@ const playVoice = (text, durationSec = null) => {
   const timeoutMs = durationSec !== null ? (durationSec * 1000) : 10000
 
   voiceTimer = setTimeout(() => { 
-    isVoicePlaying.value = false 
+    isVoicePlaying.value = false
+    voiceBubbleVisible.value = true
   }, timeoutMs) 
 }
 
@@ -182,6 +211,7 @@ const stopVoice = () => {
     clearTimeout(voiceTimer)
     voiceTimer = null
   }
+  voiceBubbleVisible.value = !!voiceDisplayText.value
 }
 
 // 供全局注入
@@ -192,7 +222,7 @@ onMounted(() => {
   updateSidebarClock()
   clockTimer = setInterval(updateSidebarClock, 1000)
 
-  window.addEventListener('pointerdown', handleUserActivity)
+  window.addEventListener('pointerdown', handleGlobalPointerDown)
   window.addEventListener('keydown', handleUserActivity)
   window.addEventListener('touchstart', handleUserActivity)
   window.addEventListener('wheel', handleUserActivity, { passive: true })
@@ -210,7 +240,7 @@ onBeforeUnmount(() => {
     clockTimer = null
   }
 
-  window.removeEventListener('pointerdown', handleUserActivity)
+  window.removeEventListener('pointerdown', handleGlobalPointerDown)
   window.removeEventListener('keydown', handleUserActivity)
   window.removeEventListener('touchstart', handleUserActivity)
   window.removeEventListener('wheel', handleUserActivity)

@@ -164,43 +164,19 @@
         </div>
 
         <div class="shrink-0 rounded-[2rem] bg-black/30 border border-white/10 p-5">
-          <div class="flex items-center gap-2 mb-3 px-1">
-            <MessageSquare class="w-4 h-4 text-ai-start" />
-            <span class="text-sm font-bold text-white tracking-widest">向 AI 教练提问</span>
-          </div>
-
-          <div class="flex gap-2 mb-3 overflow-x-auto pb-1 custom-scrollbar">
-            <button
-              v-for="(chip, idx) in quickQuestions" :key="idx"
-              @click="sendAiMessage(chip)"
-              class="whitespace-nowrap px-3 py-2 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-gray-300 hover:bg-white/10 hover:text-white transition-all shadow-sm"
-            >
-              {{ chip }}
-            </button>
-          </div>
-
-          <div class="relative flex items-center">
-            <div class="absolute left-4 w-8 h-8 rounded-full bg-gradient-to-tr from-ai-start to-ai-end flex items-center justify-center shadow-lg pointer-events-none">
-              <Mic class="w-4 h-4 text-white" />
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2 px-1">
+              <MessageSquare class="w-4 h-4 text-ai-start" />
+              <span class="text-sm font-bold text-white tracking-widest">向 AI 教练提问</span>
             </div>
-            <input
-              v-model="chatInput"
-              @keyup.enter="sendAiMessage(chatInput)"
-              type="text"
-              placeholder="输入你的问题"
-              class="w-full h-12 bg-black/50 border border-white/10 rounded-full pl-14 pr-14 text-sm text-white outline-none focus:border-neon-green/50 transition-all shadow-inner placeholder-gray-500"
-              :disabled="isChatting"
-            >
             <button
-              @click="sendAiMessage(chatInput)"
-              :disabled="!chatInput || isChatting"
-              class="absolute right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 shadow-md"
-              :class="chatInput && !isChatting ? 'bg-neon-green text-black hover:scale-105' : 'bg-white/10 text-gray-500'"
+              @click="openAiChatDialog()"
+              class="px-4 py-2 rounded-xl bg-neon-green/15 border border-neon-green/30 text-neon-green text-sm font-semibold hover:bg-neon-green/25 transition-all"
             >
-              <Loader2 v-if="isChatting" class="w-4 h-4 animate-spin" />
-              <Send v-else class="w-4 h-4 ml-0.5" />
+              打开对话框
             </button>
           </div>
+          <p class="text-xs text-gray-400 mt-3 px-1">对话仅保存在当前页面内存中，离开页面后自动清空</p>
         </div>
       </div>
 
@@ -299,6 +275,74 @@
 
       </div>
     </div>
+
+    <div
+      v-if="isAiChatDialogOpen"
+      class="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm flex items-center justify-center p-6"
+      @click.self="closeAiChatDialog"
+    >
+      <div class="w-[980px] max-w-[92vw] h-[76vh] rounded-[2rem] border border-white/15 bg-[#101318]/95 shadow-[0_30px_80px_rgba(0,0,0,.6)] p-6 flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-2xl font-bold">AI 教练对话</h3>
+            <p class="text-xs text-gray-400 mt-1">会话仅保存在内存，不落库</p>
+          </div>
+          <button @click="closeAiChatDialog" class="w-10 h-10 rounded-full border border-white/15 bg-white/5 hover:bg-white/10 transition-all">✕</button>
+        </div>
+
+        <div class="flex gap-2 mb-3 overflow-x-auto pb-1 custom-scrollbar">
+          <button
+            v-for="(chip, idx) in quickQuestions" :key="idx"
+            @click="sendAiMessage(chip)"
+            class="whitespace-nowrap px-3 py-2 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-gray-300 hover:bg-white/10 hover:text-white transition-all shadow-sm"
+          >
+            {{ chip }}
+          </button>
+        </div>
+
+        <div class="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-2 space-y-3">
+          <div v-if="chatMessages.length === 0" class="h-full flex items-center justify-center text-gray-500 text-sm">
+            还没有对话，输入问题开始。
+          </div>
+          <div
+            v-for="(msg, idx) in chatMessages"
+            :key="idx"
+            class="rounded-2xl px-4 py-3 border"
+            :class="msg.role === 'user' ? 'ml-20 bg-white/5 border-white/10' : 'mr-20 bg-neon-green/10 border-neon-green/30'"
+          >
+            <p class="text-[11px] uppercase tracking-wider mb-1" :class="msg.role === 'user' ? 'text-gray-400' : 'text-neon-green'">
+              {{ msg.role === 'user' ? '你' : 'AI 教练' }}
+            </p>
+            <p class="text-sm leading-6 whitespace-pre-wrap break-words">{{ msg.content }}</p>
+          </div>
+        </div>
+
+        <div class="pt-4 mt-4 border-t border-white/10">
+          <div class="relative flex items-center">
+            <div class="absolute left-4 w-8 h-8 rounded-full bg-gradient-to-tr from-ai-start to-ai-end flex items-center justify-center shadow-lg pointer-events-none">
+              <Mic class="w-4 h-4 text-white" />
+            </div>
+            <input
+              v-model="chatInput"
+              @keyup.enter="sendAiMessage(chatInput)"
+              type="text"
+              placeholder="输入你的问题"
+              class="w-full h-12 bg-black/50 border border-white/10 rounded-full pl-14 pr-14 text-sm text-white outline-none focus:border-neon-green/50 transition-all shadow-inner placeholder-gray-500"
+              :disabled="isChatting"
+            >
+            <button
+              @click="sendAiMessage(chatInput)"
+              :disabled="!chatInput || isChatting"
+              class="absolute right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 shadow-md"
+              :class="chatInput && !isChatting ? 'bg-neon-green text-black hover:scale-105' : 'bg-white/10 text-gray-500'"
+            >
+              <Loader2 v-if="isChatting" class="w-4 h-4 animate-spin" />
+              <Send v-else class="w-4 h-4 ml-0.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -322,11 +366,24 @@ const isDetailLoading = ref(false)
 
 const chatInput = ref('')
 const isChatting = ref(false)
+const isAiChatDialogOpen = ref(false)
+const chatMessages = ref([])
 const quickQuestions = [
   "总结本周的训练表现", 
   "评估我的心率恢复能力", 
   "基于近期负荷推荐下次计划"
 ]
+
+const openAiChatDialog = (presetQuestion = '') => {
+  isAiChatDialogOpen.value = true
+  if (presetQuestion) {
+    sendAiMessage(presetQuestion)
+  }
+}
+
+const closeAiChatDialog = () => {
+  isAiChatDialogOpen.value = false
+}
 
 const getIntensityClass = (intensity) => {
   if (intensity === '高强度' || intensity === 'HIGH') return 'bg-neon-red/20 text-neon-red border border-neon-red/30'
@@ -658,17 +715,23 @@ const selectRecord = async (id) => {
 const sendAiMessage = async (message) => {
   if (!message || isChatting.value) return
   
-  const textToSend = message
+  const textToSend = String(message).trim()
+  if (!textToSend) return
+
   chatInput.value = ''
   isChatting.value = true
+  chatMessages.value.push({ role: 'user', content: textToSend })
   
   try {
     const data = await askAi(textToSend)
+    const replyText = String(data?.reply || '').trim() || '暂时没有可用回复'
+    chatMessages.value.push({ role: 'assistant', content: replyText })
     if(playVoice) {
-       playVoice(data.reply)
+       playVoice(replyText)
     }
   } catch (err) {
     console.error('Chat 失败', err)
+    chatMessages.value.push({ role: 'assistant', content: '请求失败，请稍后重试。' })
   } finally {
     isChatting.value = false
   }

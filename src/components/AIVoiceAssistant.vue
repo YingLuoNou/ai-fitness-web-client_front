@@ -1,8 +1,9 @@
 <template>
-  <div class="fixed bottom-8 left-2 z-50">
+  <div v-if="isVisible" class="fixed bottom-8 left-2 z-50" data-voice-bubble-root>
     <div 
-      class="flex items-center gap-4 p-4 rounded-3xl backdrop-blur-xl border transition-all duration-500 shadow-2xl relative overflow-hidden"
-      :class="isPlaying ? 'bg-black/90 border-ai-start/60 w-[320px] scale-[1.02] translate-x-2' : 'bg-white/5 border-white/10 w-[260px]'"
+      class="flex items-start gap-4 p-4 rounded-3xl backdrop-blur-xl border transition-all duration-500 shadow-2xl relative overflow-hidden cursor-pointer"
+      :class="isPlaying ? 'bg-black/90 border-ai-start/60 scale-[1.02] translate-x-2 max-w-[560px]' : 'bg-white/5 border-white/10 max-w-[500px]'"
+      @click.stop="emit('toggleExpand')"
     >
       <div 
         class="relative w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-500 z-10"
@@ -15,16 +16,18 @@
         <Mic v-else class="w-6 h-6 text-white/80" stroke-width="2" />
       </div>
 
-      <div class="flex-1 flex items-center justify-between h-8 z-10 pr-1">
+      <div class="flex-1 flex items-start justify-between z-10 pr-1 min-w-0">
         
-        <div class="flex flex-col justify-center flex-1 overflow-hidden pr-3">
-          <span :class="['text-sm font-bold transition-colors duration-300 truncate', isPlaying ? 'text-white' : 'text-white/80']">
+        <div class="flex flex-col justify-center flex-1 pr-3 min-w-0">
+          <span :class="['text-sm font-bold transition-colors duration-300', isPlaying ? 'text-white' : 'text-white/80']">
             AI 教练
           </span>
-          <span :class="['text-xs tracking-wider transition-colors duration-300 mt-0.5 truncate', isPlaying ? 'text-neon-green font-medium' : 'text-white/50 uppercase']">
-            {{ isPlaying ? '说话中...' : '...' }}
+          <span :class="['text-xs tracking-wider transition-colors duration-300 mt-0.5', isPlaying ? 'text-neon-green font-medium' : 'text-white/50 uppercase']">
+            {{ isPlaying ? '说话中...' : '已播报，点击查看完整内容' }}
           </span>
-          <span v-if="speechText" class="text-xs mt-1 text-white/75 line-clamp-2">{{ speechText }}</span>
+          <span v-if="speechText" class="text-xs mt-1 text-white/75 whitespace-pre-wrap break-words" :class="isExpanded ? 'max-h-[240px] overflow-y-auto pr-1' : 'line-clamp-4'">
+            {{ speechText }}
+          </span>
         </div>
 
         <div v-if="isPlaying" class="flex items-center gap-[3px] h-6 flex-shrink-0">
@@ -43,8 +46,18 @@
 import { Mic, AudioLines } from '@lucide/vue'
 import { defineProps } from 'vue'
 
+const emit = defineEmits(['toggleExpand'])
+
 const props = defineProps({
   isPlaying: {
+    type: Boolean,
+    default: false
+  },
+  isVisible: {
+    type: Boolean,
+    default: false
+  },
+  isExpanded: {
     type: Boolean,
     default: false
   },
