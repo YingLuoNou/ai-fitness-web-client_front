@@ -81,10 +81,10 @@
 </template>
 
 <script setup>
-import { inject, onBeforeUnmount, onMounted, reactive, ref, shallowRef } from 'vue'
+import { inject, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as ROSLIB from 'roslib'
-import { fetchTrainSessionState, finishTrainSession, ingestTrainSessionRealtime } from '../api/train'
+import { fetchTrainSessionState, finishTrainSession, ingestTrainSessionRealtime, playTts } from '../api/train'
 import { fetchRosRuntimeConfig } from '../api/runtime'
 
 const router = useRouter()
@@ -218,10 +218,89 @@ const restSamplingSeconds = ref(0)
 
 const END_SAMPLING_SECONDS = 10
 
+const SPEECH_PRIORITY = {
+  AI: 1,
+  REST: 2,
+  COUNT: 3
+}
+
+const speakingPriority = ref(0)
+const speakingToken = ref(0)
+const lastCountVoiceAt = ref(0)
+const lastSpokenAiTip = ref('')
+const lastSpokenAiAt = ref(0)
+
 const phaseLabelMap = {
   WORK: '动作进行中，保持节奏。',
   REST: '组间休息中，注意呼吸恢复。',
   END: '训练结束，正在恢复。'
+}
+
+const normalizeSpeechText = (text) => String(text || '').replace(/\s+/g, ' ').trim()
+
+const speakByPriority = async (text, priority = SPEECH_PRIORITY.AI) => {
+  const normalizedText = normalizeSpeechText(text)
+  if (!normalizedText) return
+
+  // 低优先级不抢占高优先级
+  if (priority < speakingPriority.value) return
+
+  const token = speakingToken.value + 1
+  speakingToken.value = token
+  speakingPriority.value = priority
+
+  // 抢占时先停止当前动效
+  if (stopVoice) {
+    stopVoice()
+  }
+
+  if (playVoice) {
+    playVoice(normalizedText)
+  }
+
+  try {
+    const ttsRes = await playTts({ text: normalizedText })
+    if (token !== speakingToken.value) return
+
+    const durationSec = Number(ttsRes?.duration)
+    if (playVoice && Number.isFinite(durationSec) && durationSec > 0) {
+      playVoice(normalizedText, durationSec)
+    }
+  } catch {
+    // 语音播报失败不影响训练主流程
+  } finally {
+    if (token === speakingToken.value) {
+      speakingPriority.value = 0
+    }
+  }
+}
+
+const speakCountPriority = (repCount) => {
+  const rep = Math.max(0, Number(repCount) || 0)
+  if (rep <= 0) return
+
+  const now = Date.now()
+  // 限制最小间隔，防止消息风暴
+  if (now - lastCountVoiceAt.value < 600) return
+  lastCountVoiceAt.value = now
+
+  speakByPriority(`第 ${rep} 次`, SPEECH_PRIORITY.COUNT)
+}
+
+const speakRestPriority = (text) => {
+  speakByPriority(text, SPEECH_PRIORITY.REST)
+}
+
+const speakAiPriority = (text) => {
+  const normalized = normalizeSpeechText(text)
+  if (!normalized) return
+
+  const now = Date.now()
+  if (normalized === lastSpokenAiTip.value && now - lastSpokenAiAt.value < 3000) return
+  lastSpokenAiTip.value = normalized
+  lastSpokenAiAt.value = now
+
+  speakByPriority(normalized, SPEECH_PRIORITY.AI)
 }
 
 const onPoseStreamLoaded = () => {
@@ -540,16 +619,25 @@ const bindRosTopics = (cfg) => {
     } catch {
       text = msg?.data || ''
     }
-    if (text && currentPhase.value !== 'REST') coachTip.value = text
+    if (text && currentPhase.value !== 'REST') {
+      coachTip.value = text
+      speakAiPriority(text)
+    }
   })
 
   rosTopics.motionErrors?.subscribe((msg) => {
     errorCount.value += 1
     try {
       const parsed = JSON.parse(msg?.data || '{}')
-      if (parsed?.msg) coachTip.value = `⚠ ${parsed.msg}`
+      if (parsed?.msg) {
+        coachTip.value = `⚠ ${parsed.msg}`
+        speakAiPriority(coachTip.value)
+      }
     } catch {
-      if (msg?.data) coachTip.value = `⚠ ${msg.data}`
+      if (msg?.data) {
+        coachTip.value = `⚠ ${msg.data}`
+        speakAiPriority(coachTip.value)
+      }
     }
   })
 }
@@ -653,6 +741,7 @@ const startMockData = () => {
       currentSet.value = Math.min(totalSets.value, Math.floor(currentRep.value / Math.max(1, repsPerSet.value)) + 1)
     } else {
       coachTip.value = '本次训练已完成，建议进行拉伸恢复。'
+      speakAiPriority(coachTip.value)
     }
 
     metrics.heartRate = Math.min(165, metrics.heartRate + Math.round(Math.random() * 3 - 1))
@@ -715,7 +804,12 @@ const fetchSessionState = async () => {
     }
 
     if (!rosAuthoritative || data.phase === 'END') {
-      coachTip.value = data.coach_message || phaseLabelMap[data.phase] || data.tip || coachTip.value
+      const incomingTip = data.coach_message || phaseLabelMap[data.phase] || data.tip || coachTip.value
+      const tipChanged = normalizeSpeechText(incomingTip) !== normalizeSpeechText(coachTip.value)
+      coachTip.value = incomingTip
+      if (tipChanged && currentPhase.value !== 'REST') {
+        speakAiPriority(incomingTip)
+      }
     }
 
     let incomingPhase = currentPhase.value
@@ -911,9 +1005,29 @@ onMounted(() => {
 
     if (playVoice) {
       const prefix = rosDebugMode.value ? '当前为 Windows 调试模式。' : '当前为实机模式。'
-      playVoice(`${prefix}训练已开始，请保持动作标准。`)
+      speakAiPriority(`${prefix}训练已开始，请保持动作标准。`)
     }
   })()
+})
+
+watch(currentRep, (nextRep, prevRep) => {
+  const next = Number(nextRep) || 0
+  const prev = Number(prevRep) || 0
+  if (next > prev) {
+    speakCountPriority(next)
+  }
+})
+
+watch(currentPhase, (next, prev) => {
+  if (next === prev) return
+  if (next === 'REST') {
+    const sec = Math.max(1, Number(restSeconds.value) || 45)
+    speakRestPriority(`进入休息阶段，${sec} 秒。`)
+    return
+  }
+  if (prev === 'REST' && next === 'WORK') {
+    speakRestPriority('休息结束，继续训练。')
+  }
 })
 
 onBeforeUnmount(() => {
