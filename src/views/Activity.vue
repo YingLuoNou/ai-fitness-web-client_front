@@ -49,7 +49,7 @@
                     <ActivityIcon class="w-6 h-6" />
                   </div>
                   <div>
-                    <h4 class="text-xl font-bold tracking-wider">{{ record.activity_type }}</h4>
+                    <h4 class="text-xl font-bold tracking-wider">{{ getActivityName(record) }}</h4>
                     <p class="text-sm text-gray-400 mt-1">{{ record.start_time.substring(0, 16) }}</p>
                   </div>
                 </div>
@@ -123,7 +123,7 @@
             <div class="flex justify-between items-start pb-6 border-b border-white/10 shrink-0">
               <div>
                 <h3 class="text-3xl font-bold tracking-tight mb-3 flex items-center gap-4">
-                  {{ selectedRecord.activity_type }}
+                  {{ getActivityName(selectedRecord) }}
                   <span class="text-sm px-4 py-1.5 bg-white/10 rounded-full font-normal border border-white/10 tracking-wider">
                     {{ selectedRecord.training_mode }}
                   </span>
@@ -269,6 +269,23 @@ const getIntensityClass = (intensity) => {
   if (intensity === '高强度' || intensity === 'HIGH') return 'bg-neon-red/20 text-neon-red border border-neon-red/30'
   if (intensity === '中强度' || intensity === 'MED') return 'bg-neon-orange/20 text-neon-orange border border-neon-orange/30'
   return 'bg-neon-green/20 text-neon-green border border-neon-green/30'
+}
+
+const activityNameFallback = {
+  squat: '深蹲',
+  jumping_jack: '开合跳',
+  push_up: '俯卧撑',
+  pushup: '俯卧撑',
+  plank: '平板支撑',
+  lunge: '弓箭步',
+  mixed_plan: '混合计划'
+}
+
+const getActivityName = (record) => {
+  const code = String(record?.activity_type || '').trim()
+  const name = String(record?.activity_name || '').trim()
+  if (name) return name
+  return activityNameFallback[code] || code || '-'
 }
 
 const calendarDays = computed(() => {

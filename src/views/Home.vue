@@ -73,7 +73,7 @@
                     {{ getExerciseIcon(exercise.type) }}
                   </div>
                   <div>
-                    <p class="text-2xl font-bold tracking-wider">{{ getExerciseName(exercise.type) }}</p>
+                    <p class="text-2xl font-bold tracking-wider">{{ getExerciseName(exercise) }}</p>
                     <p class="text-gray-400 mt-1">单组建议: {{ (exercise.target / (exercise.sets || 1)).toFixed(0) || exercise.target }} 次 / 共 {{ exercise.sets || 1 }} 组</p>
                   </div>
                 </div>
@@ -181,7 +181,12 @@ const exerciseIconFallback = {
   plank: '🧱',
   jumping_jack: '🏃'
 }
-const getExerciseName = (type) => exerciseDict.value[type]?.name || type
+const getExerciseName = (exercise) => {
+  const type = String(exercise?.type || '').trim()
+  const serverName = String(exercise?.name || '').trim()
+  if (serverName) return serverName
+  return exerciseDict.value[type]?.name || type
+}
 const getExerciseIcon = (type) => exerciseIconFallback[type] || '🔥'
 
 const hydrateExerciseDict = async () => {
