@@ -26,9 +26,9 @@
       </div>
 
       <div class="glass-panel-light rounded-2xl p-5 text-right min-w-[320px]">
-        <p class="text-sm text-gray-300 tracking-wider">训练进度</p>
-        <p class="text-5xl font-black tracking-tighter mt-1">{{ currentRep }} / {{ targetRep }}</p>
-        <p class="text-base text-gray-300 mt-1">第 {{ currentSet }} 组 / 共 {{ totalSets }} 组</p>
+        <p class="text-sm text-gray-300 tracking-wider">训练进度（累计）</p>
+        <p class="text-5xl font-black tracking-tighter mt-1">{{ currentRep }} / {{ totalTargetReps }}</p>
+        <p class="text-base text-gray-300 mt-1">第 {{ currentSet }} 组 / 共 {{ totalSets }} 组 · 每组 {{ repsPerSet }} 次</p>
       </div>
     </div>
 
@@ -48,7 +48,7 @@
 </template>
 
 <script setup>
-import { inject, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { inject, onBeforeUnmount, onMounted, reactive, ref, shallowRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as ROSLIB from 'roslib'
 import { fetchTrainSessionState, finishTrainSession, ingestTrainSessionRealtime } from '../api/train'
@@ -65,7 +65,8 @@ const sessionId = ref(route.query.sessionId || '')
 
 const totalSets = ref(Number(route.query.sets) || 3)
 const currentSet = ref(1)
-const targetRep = ref(Number(route.query.reps) || 20)
+const repsPerSet = ref(Number(route.query.reps) || 20)
+const totalTargetReps = ref(totalSets.value * repsPerSet.value)
 const currentRep = ref(0)
 const coachTip = ref('保持核心收紧，动作速度均匀。')
 const runtimeMode = ref('windows_debug')
@@ -92,7 +93,7 @@ const stableSampling = reactive({
 const timeSeriesPayload = ref([])
 
 // ROS 实时链路（实机模式）
-const rosConn = ref(null)
+const rosConn = shallowRef(null)
 const rosConnected = ref(false)
 const rosTopics = {
   squatControl: null,
@@ -313,16 +314,11 @@ const connectRosRealtime = (cfg) => {
 
 const startMockData = () => {
   fakeTimer = setInterval(() => {
-    if (currentRep.value < targetRep.value) {
+    if (currentRep.value < totalTargetReps.value) {
       currentRep.value += 1
+      currentSet.value = Math.min(totalSets.value, Math.floor(currentRep.value / Math.max(1, repsPerSet.value)) + 1)
     } else {
-      currentRep.value = 0
-      if (currentSet.value < totalSets.value) {
-        currentSet.value += 1
-        coachTip.value = '组间休息 45 秒，调整呼吸。'
-      } else {
-        coachTip.value = '本次训练已完成，建议进行拉伸恢复。'
-      }
+      coachTip.value = '本次训练已完成，建议进行拉伸恢复。'
     }
 
     metrics.heartRate = Math.min(165, metrics.heartRate + Math.round(Math.random() * 3 - 1))
@@ -351,9 +347,24 @@ const fetchSessionState = async () => {
     metrics.heartRate = data.heart_rate ?? metrics.heartRate
     metrics.spo2 = data.spo2 ?? metrics.spo2
     currentRep.value = data.current_rep ?? currentRep.value
-    targetRep.value = data.target_reps ?? data.target_rep ?? targetRep.value
     currentSet.value = data.current_set ?? currentSet.value
     totalSets.value = data.total_sets ?? totalSets.value
+
+    if (data.reps_per_set != null) {
+      repsPerSet.value = Math.max(1, Number(data.reps_per_set) || repsPerSet.value)
+    }
+
+    if (data.target_reps != null || data.target_rep != null) {
+      const incomingTargetReps = Number(data.target_reps ?? data.target_rep)
+      if (Number.isFinite(incomingTargetReps) && incomingTargetReps > 0) {
+        totalTargetReps.value = incomingTargetReps
+      }
+    }
+
+    if ((data.reps_per_set == null) && totalSets.value > 0 && totalTargetReps.value > 0) {
+      repsPerSet.value = Math.max(1, Math.ceil(totalTargetReps.value / totalSets.value))
+    }
+
     coachTip.value = data.coach_message || phaseLabelMap[data.phase] || data.tip || coachTip.value
 
     const incomingPhase = data.phase || currentPhase.value
@@ -435,8 +446,8 @@ const ingestRealtimeState = async () => {
   if (!sessionId.value) return
   if (sessionRealtimeSourceMode.value !== 'client_relay') return
 
-  const progress = targetRep.value > 0
-    ? Math.max(0, Math.min(100, Number(((currentRep.value / targetRep.value) * 100).toFixed(1))))
+  const progress = totalTargetReps.value > 0
+    ? Math.max(0, Math.min(100, Number(((currentRep.value / totalTargetReps.value) * 100).toFixed(1))))
     : 0
 
   try {
