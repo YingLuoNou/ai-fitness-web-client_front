@@ -17,12 +17,40 @@
 
     <div class="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/40"></div>
 
+    <div
+      v-if="currentPhase === 'REST'"
+      class="absolute inset-0 z-20 flex items-center justify-center bg-black/55 backdrop-blur-sm pointer-events-none"
+    >
+      <div class="text-center px-8 py-6 rounded-3xl border border-cyan-200/40 bg-black/45 shadow-2xl">
+        <p class="text-cyan-200 text-sm tracking-[0.2em]">REST</p>
+        <p class="mt-2 text-5xl font-black">休息中</p>
+        <p class="mt-4 text-2xl font-mono">剩余 {{ restRemainingSeconds }} 秒</p>
+        <p class="mt-2 text-base text-neon-orange" v-if="stableSampling.active && stableSampling.phase === 'REST'">
+          静止采样剩余 {{ restSamplingRemainingSeconds }} 秒
+        </p>
+      </div>
+    </div>
+
+    <div
+      v-if="isEndSampling"
+      class="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-none"
+    >
+      <div class="text-center px-8 py-6 rounded-3xl border border-neon-orange/50 bg-black/50 shadow-2xl">
+        <p class="text-neon-orange text-sm tracking-[0.2em]">END</p>
+        <p class="mt-2 text-5xl font-black">结束采样中</p>
+        <p class="mt-4 text-2xl font-mono">剩余 {{ endSamplingRemainingSeconds }} 秒</p>
+        <p class="mt-2 text-base text-gray-200">请保持静止，正在采集结束体征</p>
+      </div>
+    </div>
+
     <div class="absolute top-6 left-6 right-6 flex items-start justify-between z-10">
       <div class="glass-panel rounded-2xl p-4 min-w-[280px]">
         <p class="text-sm text-gray-300 tracking-wider">实时体征</p>
         <p class="text-3xl font-mono font-bold mt-2 text-neon-red">{{ metrics.heartRate }} bpm</p>
         <p class="text-xl font-mono mt-1 text-neon-green">SpO₂ {{ metrics.spo2 }}%</p>
-        <p v-if="stableSampling.active" class="mt-2 text-sm text-neon-orange font-semibold">采集中，请尽量保持静止</p>
+        <p v-if="currentPhase === 'REST'" class="mt-2 text-sm text-cyan-200 font-semibold">休息倒计时：{{ restRemainingSeconds }}s</p>
+        <p v-if="currentPhase === 'REST' && stableSampling.active" class="mt-1 text-sm text-neon-orange font-semibold">静止采样倒计时：{{ restSamplingRemainingSeconds }}s</p>
+        <p v-if="isEndSampling" class="mt-1 text-sm text-neon-orange font-semibold">结束采样倒计时：{{ endSamplingRemainingSeconds }}s</p>
       </div>
 
       <div class="glass-panel-light rounded-2xl p-5 text-right min-w-[320px]">
@@ -118,7 +146,16 @@ let fakeTimer = null
 let pollTimer = null
 let ingestTimer = null
 let restTimer = null
+let endSamplingTimer = null
+let phaseCountdownTimer = null
 const isFinishing = ref(false)
+const isEndSampling = ref(false)
+const restRemainingSeconds = ref(0)
+const endSamplingRemainingSeconds = ref(0)
+const restSamplingRemainingSeconds = ref(0)
+const restSamplingSeconds = ref(0)
+
+const END_SAMPLING_SECONDS = 10
 
 const phaseLabelMap = {
   WORK: '动作进行中，保持节奏。',
@@ -134,6 +171,24 @@ const onPoseStreamError = () => {
   poseStreamError.value = true
 }
 
+const syncStableSamplingByPhase = (phase) => {
+  if (phase === 'REST' || phase === 'END') {
+    if (phase === 'REST') {
+      restSamplingSeconds.value = Math.max(1, Math.floor(restSeconds.value / 3))
+      restSamplingRemainingSeconds.value = restSamplingSeconds.value
+    }
+    stableSampling.active = true
+    stableSampling.phase = phase
+    stableSampling.startedAt = Date.now()
+    stableSampling.samples = []
+  } else {
+    stableSampling.active = false
+    stableSampling.phase = ''
+    stableSampling.startedAt = 0
+    stableSampling.samples = []
+  }
+}
+
 const clearRestTimer = () => {
   if (restTimer) {
     clearTimeout(restTimer)
@@ -141,19 +196,114 @@ const clearRestTimer = () => {
   }
 }
 
+const clearEndSamplingTimer = () => {
+  if (endSamplingTimer) {
+    clearTimeout(endSamplingTimer)
+    endSamplingTimer = null
+  }
+}
+
+const clearPhaseCountdownTimer = () => {
+  if (phaseCountdownTimer) {
+    clearInterval(phaseCountdownTimer)
+    phaseCountdownTimer = null
+  }
+}
+
+const updatePhaseCountdown = () => {
+  const now = Date.now()
+
+  if (currentPhase.value === 'REST') {
+    const restPassed = Math.floor((now - phaseEnteredAt.value) / 1000)
+    restRemainingSeconds.value = Math.max(0, restSeconds.value - restPassed)
+
+    if (stableSampling.active && stableSampling.phase === 'REST') {
+      const restSamplingPassed = Math.floor((now - stableSampling.startedAt) / 1000)
+      restSamplingRemainingSeconds.value = Math.max(0, restSamplingSeconds.value - restSamplingPassed)
+    } else {
+      restSamplingRemainingSeconds.value = 0
+    }
+  } else {
+    restRemainingSeconds.value = 0
+    restSamplingRemainingSeconds.value = 0
+  }
+
+  if (isEndSampling.value) {
+    const endPassed = Math.floor((now - phaseEnteredAt.value) / 1000)
+    endSamplingRemainingSeconds.value = Math.max(0, END_SAMPLING_SECONDS - endPassed)
+  } else {
+    endSamplingRemainingSeconds.value = 0
+  }
+}
+
+const startPhaseCountdown = () => {
+  clearPhaseCountdownTimer()
+  updatePhaseCountdown()
+  phaseCountdownTimer = setInterval(updatePhaseCountdown, 250)
+}
+
 const enterRestPhase = () => {
   clearRestTimer()
   currentPhase.value = 'REST'
+  phaseEnteredAt.value = Date.now()
   const sec = Math.max(1, Number(restSeconds.value) || 45)
-  coachTip.value = `本组完成，休息 ${sec} 秒后开始下一组。`
+  restRemainingSeconds.value = sec
+  restSamplingSeconds.value = Math.max(1, Math.floor(sec / 3))
+  restSamplingRemainingSeconds.value = restSamplingSeconds.value
+  syncStableSamplingByPhase('REST')
+
+  // 休息阶段暂停深蹲节点，避免误动作继续累计次数
+  if (!rosDebugMode.value && rosConnected.value) {
+    // 仅停深蹲计数，心率/血氧继续采集
+    publishSquatControl(false)
+  }
+
+  coachTip.value = '组间休息中。'
 
   restTimer = setTimeout(() => {
     if (currentPhase.value === 'REST') {
       currentPhase.value = 'WORK'
+      phaseEnteredAt.value = Date.now()
+      syncStableSamplingByPhase('WORK')
+
+      if (!rosDebugMode.value && rosConnected.value && !isPaused.value) {
+        publishSquatControl(true)
+      }
+
       coachTip.value = '休息结束，继续下一组。'
     }
     restTimer = null
   }, sec * 1000)
+}
+
+const beginEndSamplingThenFinish = () => {
+  if (isEndSampling.value || isFinishing.value) return
+
+  isEndSampling.value = true
+  clearRestTimer()
+  currentPhase.value = 'END'
+  phaseEnteredAt.value = Date.now()
+  endSamplingRemainingSeconds.value = END_SAMPLING_SECONDS
+  syncStableSamplingByPhase('END')
+
+  // 结束采样阶段：停止深蹲计数，保留心率血氧采集
+  if (!rosDebugMode.value && rosConnected.value) {
+    publishSquatControl(false)
+  }
+
+  coachTip.value = `目标已完成，请保持静止 ${END_SAMPLING_SECONDS} 秒，正在采集结束体征。`
+
+  clearEndSamplingTimer()
+  endSamplingTimer = setTimeout(async () => {
+    if (currentPhase.value === 'END') {
+      coachTip.value = '结束采样完成，正在结算与生成 AI 总结。'
+    }
+
+    // 结束采样后彻底停用节点并结算
+    publishRosControl(false)
+    await goHome({ forceFinalize: true })
+    endSamplingTimer = null
+  }, END_SAMPLING_SECONDS * 1000)
 }
 
 const hydrateRuntimeConfig = async () => {
@@ -259,6 +409,9 @@ const bindRosTopics = (cfg) => {
     const incomingRep = rosRepOffset.value + rawRep
     if (incomingRep < currentRep.value) return
 
+    // 休息阶段不接受计数（通常已下发停用，这里做前端兜底）
+    if (currentPhase.value === 'REST') return
+
     currentRep.value = Math.min(totalTargetReps.value, incomingRep)
 
     const eachSet = Math.max(1, repsPerSet.value)
@@ -274,6 +427,11 @@ const bindRosTopics = (cfg) => {
     } else {
       clearRestTimer()
       currentPhase.value = 'WORK'
+      syncStableSamplingByPhase('WORK')
+    }
+
+    if (currentRep.value >= totalTargetReps.value) {
+      beginEndSamplingThenFinish()
     }
   })
 
@@ -320,6 +478,14 @@ const publishRosControl = (enabled) => {
   }
 }
 
+const publishSquatControl = (enabled) => {
+  try {
+    rosTopics.squatControl?.publish({ data: !!enabled })
+  } catch {
+    // 忽略控制下发异常
+  }
+}
+
 const togglePause = () => {
   if (rosDebugMode.value) {
     isPaused.value = !isPaused.value
@@ -335,7 +501,9 @@ const togglePause = () => {
   if (isPaused.value) {
     publishRosControl(true)
     isPaused.value = false
-    coachTip.value = '训练已继续，请保持动作标准。'
+    if (currentPhase.value !== 'REST') {
+      coachTip.value = '训练已继续，请保持动作标准。'
+    }
   } else {
     clearRestTimer()
     publishRosControl(false)
@@ -421,7 +589,8 @@ const fetchSessionState = async () => {
     const data = await fetchTrainSessionState(sessionId.value)
     if (data.status === 'FINISHED') {
       stopPolling()
-      await goHome()
+      disconnectRos()
+      router.push('/home')
       return
     }
 
@@ -466,17 +635,7 @@ const fetchSessionState = async () => {
       clearRestTimer()
       currentPhase.value = incomingPhase
       phaseEnteredAt.value = Date.now()
-      if (incomingPhase === 'REST' || incomingPhase === 'END') {
-        stableSampling.active = true
-        stableSampling.phase = incomingPhase
-        stableSampling.startedAt = Date.now()
-        stableSampling.samples = []
-      } else {
-        stableSampling.active = false
-        stableSampling.phase = ''
-        stableSampling.startedAt = 0
-        stableSampling.samples = []
-      }
+      syncStableSamplingByPhase(incomingPhase)
     }
 
     if (stableSampling.active) {
@@ -488,7 +647,10 @@ const fetchSessionState = async () => {
       })
 
       const holdSecs = Math.floor((Date.now() - stableSampling.startedAt) / 1000)
-      if (holdSecs >= 15) {
+      const requiredHoldSecs = stableSampling.phase === 'END'
+        ? END_SAMPLING_SECONDS
+        : Math.max(1, Math.floor(restSeconds.value / 3))
+      if (holdSecs >= requiredHoldSecs) {
         const hrValues = stableSampling.samples.map((s) => s.heart_rate).filter((v) => Number.isFinite(v))
         const spo2Values = stableSampling.samples.map((s) => s.spo2).filter((v) => Number.isFinite(v))
 
@@ -509,7 +671,7 @@ const fetchSessionState = async () => {
               spo2: avgSpo2,
               current_rep: currentRep.value,
               is_stable: true,
-              hold_secs: 15
+              hold_secs: requiredHoldSecs
             })
           }
         }
@@ -582,7 +744,7 @@ const finishSession = async () => {
   try {
     if (currentPhase.value === 'END' && stableSampling.active) {
       const holdSecs = Math.floor((Date.now() - stableSampling.startedAt) / 1000)
-      if (holdSecs >= 15) {
+      if (holdSecs >= END_SAMPLING_SECONDS) {
         const hrValues = stableSampling.samples.map((s) => s.heart_rate).filter((v) => Number.isFinite(v))
         const spo2Values = stableSampling.samples.map((s) => s.spo2).filter((v) => Number.isFinite(v))
         if (hrValues.length > 0 && spo2Values.length > 0) {
@@ -594,7 +756,7 @@ const finishSession = async () => {
             spo2: Math.round(spo2Values.reduce((a, b) => a + b, 0) / spo2Values.length),
             current_rep: currentRep.value,
             is_stable: true,
-            hold_secs: 15
+            hold_secs: END_SAMPLING_SECONDS
           })
         }
       }
@@ -614,7 +776,18 @@ const finishSession = async () => {
   }
 }
 
-const goHome = async () => {
+const goHome = async (options = {}) => {
+  const forceFinalize = !!options.forceFinalize
+
+  // 所有结束路径：先做 10s END 采样，再结算
+  if (!forceFinalize && !isEndSampling.value && !isFinishing.value) {
+    beginEndSamplingThenFinish()
+    return
+  }
+
+  if (isFinishing.value) return
+  isEndSampling.value = false
+  clearEndSamplingTimer()
   isPaused.value = false
   stopPolling()
   stopRealtimeIngest()
@@ -631,6 +804,7 @@ onMounted(() => {
 
     sessionStartedAt.value = Date.now()
     phaseEnteredAt.value = Date.now()
+    startPhaseCountdown()
 
     connectRosRealtime(cfg)
 
@@ -654,6 +828,8 @@ onBeforeUnmount(() => {
   stopPolling()
   stopRealtimeIngest()
   clearRestTimer()
+  clearEndSamplingTimer()
+  clearPhaseCountdownTimer()
   disconnectRos()
   if (stopVoice) stopVoice()
 })

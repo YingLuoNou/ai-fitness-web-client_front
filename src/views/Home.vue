@@ -234,13 +234,14 @@ const startTodayPlan = async () => {
     const first = dashboardData.plan_status.today_exercises[0] || {}
     const sets = first.sets || 1
     const reps = first.reps_per_set || Math.max(1, Math.floor((first.target || 0) / (sets || 1)))
+    const restSec = Math.max(10, Number(first.rest_sec) || 45)
 
     const payload = {
       mode: 'guided',
       exercises,
       sets,
       reps,
-      restSec: 45,
+      restSec,
       intensity: 'medium'
     }
 
@@ -249,7 +250,10 @@ const startTodayPlan = async () => {
     if (sessionId) {
       statusMessage.type = 'ok'
       statusMessage.text = '训练会话已创建，跳转中...'
-      router.push({ path: '/training-session', query: { sessionId, sets: String(sets), reps: String(reps) } })
+      router.push({
+        path: '/training-session',
+        query: { sessionId, sets: String(sets), reps: String(reps), restSec: String(restSec) }
+      })
     } else {
       statusMessage.type = 'warning'
       statusMessage.text = '会话创建失败，使用本地训练页'
