@@ -1,5 +1,5 @@
 <template>
-  <div class="activity-page w-full h-full flex flex-col relative text-white px-10 py-6">
+  <div class="activity-page w-full h-full flex flex-col relative text-white font-sans px-10 py-6">
     
     <header class="flex justify-between items-center mb-8 shrink-0 pl-2">
       <div>
@@ -694,6 +694,11 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.activity-page {
+  color: #fff;
+  font-family: "SF Pro Display", Inter, system-ui, sans-serif;
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
   height: 6px;
