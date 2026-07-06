@@ -58,6 +58,90 @@
       <div class="col-span-7 glass-panel-light rounded-[2rem] p-6 flex flex-col gap-4">
         <h3 class="text-2xl font-bold tracking-wider">安全与设备</h3>
 
+        <div class="rounded-2xl border border-neon-green/30 bg-neon-green/5 p-5">
+          <div class="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <p class="text-lg font-bold text-white">用户设置</p>
+              <p class="text-sm text-gray-300 mt-1">可修改手机号、性别、身高、体重、出生日期与头像链接</p>
+            </div>
+            <span class="text-xs px-3 py-1 rounded-full border" :class="dirtyTagClass">
+              {{ isDirty ? '未保存' : '已同步' }}
+            </span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">手机号</label>
+              <input
+                v-model="settingsForm.phone"
+                @input="handlePhoneInput"
+                inputmode="numeric"
+                type="text"
+                maxlength="11"
+                placeholder="请输入手机号"
+                class="w-full h-11 rounded-xl px-3 bg-white/5 border border-white/10 focus:border-neon-green/70 outline-none transition-all"
+              />
+              <p v-if="phoneValidationError" class="text-xs text-neon-red mt-1">{{ phoneValidationError }}</p>
+            </div>
+
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">性别</label>
+              <div class="grid grid-cols-3 gap-2">
+                <button type="button" @click="settingsForm.gender = '男'" class="h-11 rounded-xl border text-sm transition-all"
+                  :class="settingsForm.gender === '男' ? 'bg-neon-green text-black border-neon-green' : 'bg-white/5 text-white border-white/10 hover:bg-white/10'">男</button>
+                <button type="button" @click="settingsForm.gender = '女'" class="h-11 rounded-xl border text-sm transition-all"
+                  :class="settingsForm.gender === '女' ? 'bg-neon-green text-black border-neon-green' : 'bg-white/5 text-white border-white/10 hover:bg-white/10'">女</button>
+                <button type="button" @click="settingsForm.gender = ''" class="h-11 rounded-xl border text-sm transition-all"
+                  :class="settingsForm.gender === '' ? 'bg-neon-green text-black border-neon-green' : 'bg-white/5 text-white border-white/10 hover:bg-white/10'">未设置</button>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">身高（cm）</label>
+              <input v-model.number="settingsForm.height" type="number" min="80" max="260" placeholder="例如 170" class="w-full h-11 rounded-xl px-3 bg-white/5 border border-white/10 focus:border-neon-green/70 outline-none transition-all" />
+            </div>
+
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">体重（kg）</label>
+              <input v-model.number="settingsForm.weight" type="number" min="20" max="300" placeholder="例如 65" class="w-full h-11 rounded-xl px-3 bg-white/5 border border-white/10 focus:border-neon-green/70 outline-none transition-all" />
+            </div>
+
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">出生日期</label>
+              <input v-model="settingsForm.birthdate" type="date" class="w-full h-11 rounded-xl px-3 bg-white/5 border border-white/10 focus:border-neon-green/70 outline-none transition-all" />
+            </div>
+
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">头像链接</label>
+              <input v-model.trim="settingsForm.avatar" type="text" placeholder="https://..." class="w-full h-11 rounded-xl px-3 bg-white/5 border border-white/10 focus:border-neon-green/70 outline-none transition-all" />
+              <p v-if="avatarValidationError" class="text-xs text-neon-red mt-1">{{ avatarValidationError }}</p>
+            </div>
+          </div>
+
+          <div class="mt-3 rounded-xl border border-white/10 bg-black/25 p-3 flex items-center gap-3">
+            <div class="w-14 h-14 rounded-full bg-white/10 border border-white/10 overflow-hidden flex items-center justify-center text-xs text-gray-400 shrink-0">
+              <img v-if="avatarPreviewUrl && !avatarPreviewFailed" :src="avatarPreviewUrl" alt="avatar-preview" class="w-full h-full object-cover" @error="avatarPreviewFailed = true" />
+              <span v-else>预览</span>
+            </div>
+            <div class="text-xs text-gray-300 min-w-0">
+              <p class="text-gray-400">头像预览</p>
+              <p v-if="avatarPreviewUrl && !avatarPreviewFailed" class="truncate mt-1">{{ avatarPreviewUrl }}</p>
+              <p v-else-if="avatarPreviewFailed" class="text-neon-orange mt-1">图片加载失败，请检查链接可访问性</p>
+              <p v-else class="mt-1">请输入有效的 http/https 图片链接</p>
+            </div>
+          </div>
+
+          <p v-if="settingsError" class="text-sm text-neon-red mt-3">{{ settingsError }}</p>
+
+          <div class="flex justify-end gap-3 mt-4">
+            <button @click="resetSettingsForm" :disabled="isSavingProfile" class="px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all disabled:opacity-60">重置</button>
+            <button @click="saveProfileSettings" :disabled="isSavingProfile || !isDirty" class="px-5 py-2 rounded-xl font-semibold transition-all"
+              :class="isSavingProfile || !isDirty ? 'bg-white/5 text-gray-500 border border-white/10 cursor-not-allowed' : 'btn-neon-primary'">
+              {{ isSavingProfile ? '保存中...' : '保存设置' }}
+            </button>
+          </div>
+        </div>
+
         <div class="grid grid-cols-2 gap-4">
           <button @click="refreshProfile" :disabled="isLoadingProfile" class="h-28 rounded-2xl bg-white/10 border border-white/15 hover:bg-white/15 transition-all text-left px-5 disabled:opacity-60 disabled:cursor-not-allowed">
             <p class="text-lg font-bold">同步资料</p>
@@ -112,9 +196,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { fetchUserProfile } from '../api/user'
+import { fetchUserProfile, updateUserProfile } from '../api/user'
 import { registerFace } from '../api/auth'
 
 const router = useRouter()
@@ -126,13 +210,35 @@ const profile = reactive({
   gender: '',
   height: null,
   weight: null,
-  avatar: ''
+  avatar: '',
+  birthdate: ''
 })
 
 const isLoadingProfile = ref(false)
+const isSavingProfile = ref(false)
 const isFaceBusy = ref(false)
 const faceVideoRef = ref(null)
 const faceLoopActive = ref(false)
+
+const settingsForm = reactive({
+  phone: '',
+  gender: '',
+  height: '',
+  weight: '',
+  birthdate: '',
+  avatar: ''
+})
+
+const settingsSnapshot = ref(JSON.stringify({
+  phone: '',
+  gender: '',
+  height: '',
+  weight: '',
+  birthdate: '',
+  avatar: ''
+}))
+const settingsError = ref('')
+const avatarPreviewFailed = ref(false)
 
 let activeMedia = null
 let activeTrack = null
@@ -161,6 +267,61 @@ const faceStatusClass = computed(() => {
   return 'text-gray-300'
 })
 
+const normalizedSettings = computed(() => ({
+  phone: settingsForm.phone || '',
+  gender: settingsForm.gender || '',
+  height: settingsForm.height === '' || settingsForm.height === null ? '' : Number(settingsForm.height),
+  weight: settingsForm.weight === '' || settingsForm.weight === null ? '' : Number(settingsForm.weight),
+  birthdate: settingsForm.birthdate || '',
+  avatar: settingsForm.avatar || ''
+}))
+
+const currentSettingsSerialized = computed(() => JSON.stringify(normalizedSettings.value))
+
+const isDirty = computed(() => currentSettingsSerialized.value !== settingsSnapshot.value)
+
+const dirtyTagClass = computed(() => {
+  return isDirty.value
+    ? 'text-neon-orange border-neon-orange/40 bg-neon-orange/15'
+    : 'text-neon-green border-neon-green/40 bg-neon-green/15'
+})
+
+const isValidMainlandPhone = (value) => {
+  const text = String(value || '').trim()
+  if (!text) return true
+  return /^1[3-9]\d{9}$/.test(text)
+}
+
+const isValidAvatarHttpUrl = (value) => {
+  const text = String(value || '').trim()
+  if (!text) return true
+  try {
+    const url = new URL(text)
+    return ['http:', 'https:'].includes(url.protocol)
+  } catch (error) {
+    return false
+  }
+}
+
+const phoneValidationError = computed(() => {
+  const text = String(settingsForm.phone || '').trim()
+  if (!text) return ''
+  if (isValidMainlandPhone(text)) return ''
+  return '手机号格式不正确（需 11 位大陆手机号）'
+})
+
+const avatarValidationError = computed(() => {
+  const text = String(settingsForm.avatar || '').trim()
+  if (!text) return ''
+  if (isValidAvatarHttpUrl(text)) return ''
+  return '头像链接必须为 http/https 地址'
+})
+
+const avatarPreviewUrl = computed(() => {
+  if (avatarValidationError.value) return ''
+  return String(settingsForm.avatar || '').trim()
+})
+
 const displayText = (value) => {
   if (value === null || value === undefined) return '--'
   const text = String(value).trim()
@@ -184,6 +345,26 @@ const hasAnyProfileData = computed(() => {
   ].some((v) => v !== null && v !== undefined && String(v).trim() !== '')
 })
 
+const applyProfileToSettingsForm = () => {
+  settingsForm.phone = profile.phone || ''
+  settingsForm.gender = profile.gender || ''
+  settingsForm.height = profile.height ?? ''
+  settingsForm.weight = profile.weight ?? ''
+  settingsForm.birthdate = profile.birthdate || ''
+  settingsForm.avatar = profile.avatar || ''
+  avatarPreviewFailed.value = false
+  settingsSnapshot.value = currentSettingsSerialized.value
+}
+
+const resetSettingsForm = () => {
+  applyProfileToSettingsForm()
+  settingsError.value = ''
+}
+
+const handlePhoneInput = () => {
+  settingsForm.phone = String(settingsForm.phone || '').replace(/\D/g, '').slice(0, 11)
+}
+
 const refreshProfile = async () => {
   isLoadingProfile.value = true
   try {
@@ -196,6 +377,9 @@ const refreshProfile = async () => {
     profile.height = data.height ?? data.user_info?.height ?? null
     profile.weight = data.weight ?? data.user_info?.weight ?? null
     profile.avatar = data.avatar ?? ''
+    profile.birthdate = data.birthdate ?? ''
+
+    applyProfileToSettingsForm()
 
     if (hasAnyProfileData.value) {
       statusMessage.type = 'ok'
@@ -209,6 +393,90 @@ const refreshProfile = async () => {
     statusMessage.text = '资料同步失败，请稍后重试'
   } finally {
     isLoadingProfile.value = false
+  }
+}
+
+const validateSettings = () => {
+  settingsError.value = ''
+
+  if (phoneValidationError.value) {
+    settingsError.value = phoneValidationError.value
+    return false
+  }
+
+  if (avatarValidationError.value) {
+    settingsError.value = avatarValidationError.value
+    return false
+  }
+
+  const hasHeight = settingsForm.height !== '' && settingsForm.height !== null
+  const hasWeight = settingsForm.weight !== '' && settingsForm.weight !== null
+  if (hasHeight) {
+    const h = Number(settingsForm.height)
+    if (!Number.isFinite(h) || h < 80 || h > 260) {
+      settingsError.value = '身高范围应在 80-260 cm'
+      return false
+    }
+  }
+  if (hasWeight) {
+    const w = Number(settingsForm.weight)
+    if (!Number.isFinite(w) || w < 20 || w > 300) {
+      settingsError.value = '体重范围应在 20-300 kg'
+      return false
+    }
+  }
+  if (settingsForm.birthdate && !/^\d{4}-\d{2}-\d{2}$/.test(settingsForm.birthdate)) {
+    settingsError.value = '出生日期格式应为 YYYY-MM-DD'
+    return false
+  }
+  return true
+}
+
+const saveProfileSettings = async () => {
+  if (isSavingProfile.value || !isDirty.value) return
+  if (!validateSettings()) return
+
+  isSavingProfile.value = true
+  settingsError.value = ''
+
+  const prev = JSON.parse(settingsSnapshot.value || '{}')
+  const current = normalizedSettings.value
+  const payload = {}
+  for (const key of Object.keys(current)) {
+    if (current[key] !== (prev[key] ?? '')) {
+      payload[key] = current[key]
+    }
+  }
+
+  if (Object.keys(payload).length === 0) {
+    isSavingProfile.value = false
+    return
+  }
+
+  try {
+
+watch(() => settingsForm.avatar, () => {
+  avatarPreviewFailed.value = false
+})
+    const data = await updateUserProfile(payload)
+
+    profile.phone = data.phone ?? ''
+    profile.gender = data.gender ?? ''
+    profile.height = data.height ?? null
+    profile.weight = data.weight ?? null
+    profile.avatar = data.avatar ?? ''
+    profile.birthdate = data.birthdate ?? ''
+
+    applyProfileToSettingsForm()
+
+    statusMessage.type = 'ok'
+    statusMessage.text = '个人信息已更新'
+  } catch (error) {
+    settingsError.value = error?.data?.error || error?.message || '保存失败，请稍后重试'
+    statusMessage.type = 'error'
+    statusMessage.text = '个人信息保存失败'
+  } finally {
+    isSavingProfile.value = false
   }
 }
 

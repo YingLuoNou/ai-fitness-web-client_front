@@ -15,3 +15,11 @@ export const fetchUserActivityDetail = (id) => {
 export const fetchUserProfile = () => {
   return request('/api/user/profile/', { auth: true })
 }
+
+export const updateUserProfile = (payload) => {
+  return request('/api/user/profile/', {
+    method: 'PUT',
+    auth: true,
+    body: payload
+  })
+}
