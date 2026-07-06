@@ -313,7 +313,12 @@
             <p class="text-[11px] uppercase tracking-wider mb-1" :class="msg.role === 'user' ? 'text-gray-400' : 'text-neon-green'">
               {{ msg.role === 'user' ? '你' : 'AI 教练' }}
             </p>
-            <p class="text-sm leading-6 whitespace-pre-wrap break-words">{{ msg.content }}</p>
+            <p v-if="msg.role === 'user'" class="text-sm leading-6 whitespace-pre-wrap break-words">{{ msg.content }}</p>
+            <div
+              v-else
+              class="text-sm leading-6 break-words markdown-body"
+              v-html="renderAssistantMarkdown(msg.content)"
+            ></div>
           </div>
         </div>
 
@@ -350,10 +355,13 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch, inject } from 'vue'
 import { List, CalendarDays, MousePointerClick, Activity as ActivityIcon, Sparkles, Mic, Send, Loader2, HeartPulse, History, MessageSquare, ChevronLeft, ChevronRight } from '@lucide/vue'
 import * as echarts from 'echarts' // 引入 ECharts
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import { fetchUserActivities, fetchUserActivityDetail } from '../api/user'
 import { askAi } from '../api/chat'
 
-const playVoice = inject('playVoice')
+const speakWithBackendTts = inject('speakWithBackendTts')
+const stopVoice = inject('stopVoice')
 
 const viewMode = ref('list')
 const isLoading = ref(false)
@@ -374,6 +382,17 @@ const quickQuestions = [
   "基于近期负荷推荐下次计划"
 ]
 
+marked.setOptions({
+  breaks: true,
+  gfm: true
+})
+
+const renderAssistantMarkdown = (text) => {
+  const raw = String(text || '')
+  const html = marked.parse(raw)
+  return DOMPurify.sanitize(String(html))
+}
+
 const openAiChatDialog = (presetQuestion = '') => {
   isAiChatDialogOpen.value = true
   if (presetQuestion) {
@@ -382,6 +401,9 @@ const openAiChatDialog = (presetQuestion = '') => {
 }
 
 const closeAiChatDialog = () => {
+  if (stopVoice) {
+    stopVoice()
+  }
   isAiChatDialogOpen.value = false
 }
 
@@ -724,10 +746,11 @@ const sendAiMessage = async (message) => {
   
   try {
     const data = await askAi(textToSend)
-    const replyText = String(data?.reply || '').trim() || '暂时没有可用回复'
-    chatMessages.value.push({ role: 'assistant', content: replyText })
-    if(playVoice) {
-       playVoice(replyText)
+    const messageText = String(data?.reply || data?.spoken_text || data?.tts_text || '').trim() || '暂时没有可用回复'
+    const ttsText = String(data?.tts_text || data?.reply || data?.spoken_text || '').trim() || messageText
+    chatMessages.value.push({ role: 'assistant', content: messageText })
+    if (speakWithBackendTts) {
+      await speakWithBackendTts(ttsText)
     }
   } catch (err) {
     console.error('Chat 失败', err)
@@ -776,5 +799,51 @@ onBeforeUnmount(() => {
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
+}
+
+.markdown-body :deep(p) {
+  margin: 0.2rem 0;
+}
+
+.markdown-body :deep(pre) {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+  overflow-x: auto;
+}
+
+.markdown-body :deep(code) {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 0.35rem;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.85em;
+}
+
+.markdown-body :deep(pre code) {
+  background: transparent;
+  padding: 0;
+}
+
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) {
+  margin: 0.35rem 0;
+  padding-left: 1.1rem;
+}
+
+.markdown-body :deep(li + li) {
+  margin-top: 0.2rem;
+}
+
+.markdown-body :deep(a) {
+  color: #79f8b1;
+  text-decoration: underline;
+}
+
+.markdown-body :deep(blockquote) {
+  border-left: 3px solid rgba(50, 255, 126, 0.45);
+  padding-left: 0.65rem;
+  color: rgba(255, 255, 255, 0.85);
+  margin: 0.35rem 0;
 }
 </style>

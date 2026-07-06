@@ -216,12 +216,13 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, inject, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { fetchUserProfile, updateUserProfile } from '../api/user'
 import { registerFace } from '../api/auth'
 
 const router = useRouter()
+const speakWithBackendTts = inject('speakWithBackendTts')
 
 const profile = reactive({
   username: '',
@@ -601,6 +602,10 @@ const toggleFaceEnroll = async () => {
         faceFeedback.desc = result?.msg || '人脸特征绑定成功'
         statusMessage.type = 'ok'
         statusMessage.text = '人脸录入完成'
+        const ttsText = String(result?.tts_text || '人脸特征录入成功').trim()
+        if (ttsText && speakWithBackendTts) {
+          await speakWithBackendTts(ttsText)
+        }
         faceLoopActive.value = false
         break
       }

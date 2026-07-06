@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@lucide/vue": "^1.23.0",
+    "dompurify": "^3.4.11",
     "echarts": "^6.1.0",
+    "marked": "^18.0.5",
     "roslib": "^2.1.0",
     "vue": "^3.5.39",
     "vue-router": "4"

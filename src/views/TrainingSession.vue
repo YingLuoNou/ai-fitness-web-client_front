@@ -89,8 +89,8 @@ import { fetchRosRuntimeConfig } from '../api/runtime'
 
 const router = useRouter()
 const route = useRoute()
-const playVoice = inject('playVoice')
 const stopVoice = inject('stopVoice')
+const speakWithBackendTts = inject('speakWithBackendTts')
 
 const poseStreamUrl = ref('')
 const poseStreamError = ref(false)
@@ -254,18 +254,11 @@ const speakByPriority = async (text, priority = SPEECH_PRIORITY.AI) => {
     stopVoice()
   }
 
-  if (playVoice) {
-    playVoice(normalizedText)
-  }
-
   try {
-    const ttsRes = await playTts({ text: normalizedText })
+    const ttsRes = speakWithBackendTts
+      ? await speakWithBackendTts(normalizedText)
+      : await playTts({ text: normalizedText })
     if (token !== speakingToken.value) return
-
-    const durationSec = Number(ttsRes?.duration)
-    if (playVoice && Number.isFinite(durationSec) && durationSec > 0) {
-      playVoice(normalizedText, durationSec)
-    }
   } catch {
     // 语音播报失败不影响训练主流程
   } finally {

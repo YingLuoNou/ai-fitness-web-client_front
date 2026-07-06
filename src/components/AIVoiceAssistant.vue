@@ -1,8 +1,8 @@
 <template>
   <div v-if="isVisible" class="fixed bottom-8 left-2 z-50" data-voice-bubble-root>
     <div 
-      class="flex items-start gap-4 p-4 rounded-3xl backdrop-blur-xl border transition-all duration-500 shadow-2xl relative overflow-hidden cursor-pointer"
-      :class="isPlaying ? 'bg-black/90 border-ai-start/60 scale-[1.02] translate-x-2 max-w-[560px]' : 'bg-white/5 border-white/10 max-w-[500px]'"
+      class="voice-bubble group flex items-start gap-3 rounded-3xl backdrop-blur-xl border shadow-2xl relative overflow-hidden cursor-pointer transition-all duration-500 ease-[cubic-bezier(.2,.8,.2,1)]"
+      :class="bubbleClass"
       @click.stop="emit('toggleExpand')"
     >
       <div 
@@ -16,16 +16,16 @@
         <Mic v-else class="w-6 h-6 text-white/80" stroke-width="2" />
       </div>
 
-      <div class="flex-1 flex items-start justify-between z-10 pr-1 min-w-0">
+      <div class="flex-1 flex items-start justify-between z-10 pr-1 min-w-0 overflow-hidden">
         
         <div class="flex flex-col justify-center flex-1 pr-3 min-w-0">
-          <span :class="['text-sm font-bold transition-colors duration-300', isPlaying ? 'text-white' : 'text-white/80']">
+          <span :class="['text-sm font-bold transition-all duration-300', collapsedMode ? 'text-white/90' : (isPlaying ? 'text-white' : 'text-white/80')]">
             AI 教练
           </span>
-          <span :class="['text-xs tracking-wider transition-colors duration-300 mt-0.5', isPlaying ? 'text-neon-green font-medium' : 'text-white/50 uppercase']">
+          <span :class="['text-xs tracking-wider transition-all duration-300 mt-0.5', isPlaying ? 'text-neon-green font-medium' : 'text-white/50 uppercase']">
             {{ collapsedMode ? '点击展开上次回复' : (isPlaying ? '说话中...' : '已播报，点击查看完整内容') }}
           </span>
-          <span v-if="speechText && !collapsedMode" class="text-xs mt-1 text-white/75 whitespace-pre-wrap break-words" :class="isExpanded ? 'max-h-[240px] overflow-y-auto pr-1' : 'line-clamp-4'">
+          <span v-if="speechText && !collapsedMode" class="text-xs mt-1 text-white/75 whitespace-pre-wrap break-words transition-all duration-500" :class="(isExpanded || isPlaying) ? 'max-h-[240px] overflow-y-auto pr-1 opacity-100' : 'line-clamp-4 opacity-90'">
             {{ speechText }}
           </span>
         </div>
@@ -68,10 +68,26 @@ const props = defineProps({
 })
 
 const collapsedMode = computed(() => !props.isPlaying && !props.isExpanded)
+
+const bubbleClass = computed(() => {
+  if (props.isExpanded) {
+    return 'bg-black/85 border-ai-start/50 w-[500px] max-w-[min(560px,90vw)] p-4 translate-x-2 scale-[1.01]'
+  }
+
+  if (props.isPlaying) {
+    return 'bg-black/90 border-ai-start/60 w-[420px] max-w-[min(520px,88vw)] p-4 translate-x-2 scale-[1.02]'
+  }
+
+  return 'bg-white/8 border-white/15 w-[212px] p-3 hover:w-[236px] hover:border-white/25 hover:bg-white/10 hover:-translate-y-0.5'
+})
 </script>
 
 <style scoped>
 .animate-soundwave {
   animation: soundwave 0.8s ease-in-out infinite;
+}
+
+.voice-bubble {
+  transform-origin: left bottom;
 }
 </style>

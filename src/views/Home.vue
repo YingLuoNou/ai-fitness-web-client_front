@@ -122,9 +122,8 @@
 import { ref, reactive, onMounted, onBeforeUnmount, computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { fetchDashboard } from '../api/user'
-import { fetchExercises, playTts, startTrainSession } from '../api/train'
-const playVoice = inject('playVoice')
-const stopVoice = inject('stopVoice')
+import { fetchExercises, startTrainSession } from '../api/train'
+const speakWithBackendTts = inject('speakWithBackendTts')
 
 const router = useRouter()
 const WELCOME_VOICE_PENDING_KEY = 'welcome_voice_pending'
@@ -280,7 +279,7 @@ const startTodayPlan = async () => {
   }
 }
 
-// --- 核心方法：触发后端直出硬件语音 ---
+// --- 核心方法：由前端统一触发后端 TTS，并同步气泡动效 ---
 const triggerWelcomeVoice = async (username, planStatus) => {
   let textToSpeak = ''
   if (planStatus.today_exercises.length === 0) {
@@ -291,34 +290,12 @@ const triggerWelcomeVoice = async (username, planStatus) => {
     textToSpeak = `欢迎回来，${username}。今天还有 ${100 - planStatus.progress_percent}% 的进度未完成，请点击启动今日计划。`
   }
   
-  // 1. 发起请求前，先触发一次动效，让UI瞬间响应
-  playVoice(textToSpeak)
-  const startTime = Date.now() // 记录请求开始时间戳
-
   try {
-    const data = await playTts({
-      text: textToSpeak,
-      voice: 'zh-CN-YunxiNeural'
-    })
-
-    // 2. 接口返回后，计算请求耗掉了多少秒
-    const elapsedSec = ((Date.now() - startTime) / 1000 ) 
-    
-    if (data.duration) {
-      // 计算音频真正的剩余播放时间
-      const remainingSec = data.duration - elapsedSec + 2.5
-      
-      if (remainingSec > 0) {
-        // 如果音频还没播完，更新动效定时器，补齐剩余时间
-        playVoice(textToSpeak, remainingSec)
-      } else {
-        // 如果请求耗时超过了音频时长（例如后端的 play_tts_sync 是阻塞播完才返回），直接停止动效
-        if (stopVoice) stopVoice()
-      }
+    if (speakWithBackendTts) {
+      await speakWithBackendTts(textToSpeak, 'zh-CN-YunxiNeural')
     }
   } catch (err) {
     console.error('触发入场语音失败:', err)
-    if (stopVoice) stopVoice() // 网络异常，停止动效
   }
 }
 

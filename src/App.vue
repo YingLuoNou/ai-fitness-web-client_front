@@ -84,6 +84,7 @@ import { computed, ref, provide, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Home, Activity, User, LogOut } from '@lucide/vue'
 import AIVoiceAssistant from './components/AIVoiceAssistant.vue'
+import { playTts } from './api/train'
 
 const route = useRoute()
 const router = useRouter()
@@ -110,16 +111,11 @@ const updateSidebarClock = () => {
 const isVoicePlaying = ref(false)
 let voiceTimer = null 
 const voiceDisplayText = ref('')
+const voiceFullText = ref('')
 let voiceStreamTimer = null
-const voiceBubbleVisible = ref(false)
+const voiceBubbleVisible = ref(true)
 const voiceBubbleExpanded = ref(false)
-
-const clearVoiceStream = () => {
-  if (voiceStreamTimer) {
-    clearInterval(voiceStreamTimer)
-    voiceStreamTimer = null
-  }
-}
+const voiceRequestToken = ref(0)
 
 const switchAccount = () => {
   localStorage.removeItem('auth_token')
@@ -162,9 +158,6 @@ const handleGlobalPointerDown = (event) => {
   }
 
   voiceBubbleExpanded.value = false
-  if (!isVoicePlaying.value && !voiceDisplayText.value) {
-    voiceBubbleVisible.value = false
-  }
 }
 
 const toggleVoiceBubbleExpand = () => {
@@ -172,51 +165,95 @@ const toggleVoiceBubbleExpand = () => {
   voiceBubbleExpanded.value = !voiceBubbleExpanded.value
 }
 
+const clearVoiceStream = () => {
+  if (voiceStreamTimer) {
+    clearInterval(voiceStreamTimer)
+    voiceStreamTimer = null
+  }
+}
+
 // durationSec：允许传入精确的秒数
 const playVoice = (text, durationSec = null) => {
   isVoicePlaying.value = true
-  const safeText = typeof text === 'string' ? text : ''
+  const safeText = String(text || '')
+  voiceFullText.value = safeText
   voiceDisplayText.value = ''
   voiceBubbleVisible.value = true
   voiceBubbleExpanded.value = false
 
   clearVoiceStream()
   let index = 0
+  const step = Math.max(1, Math.ceil(safeText.length / 120))
   voiceStreamTimer = setInterval(() => {
-    index += 1
+    index = Math.min(safeText.length, index + step)
     voiceDisplayText.value = safeText.slice(0, index)
     if (index >= safeText.length) {
       clearVoiceStream()
+      voiceDisplayText.value = safeText
     }
-  }, 55)
+  }, 45)
   
-  if (voiceTimer) {
-    clearTimeout(voiceTimer)
-  }
-  
-  // 如果后端传了准确时长，则转换为毫秒；如果没有传，给个兜底 10 秒防卡死
-  const timeoutMs = durationSec !== null ? (durationSec * 1000) : 10000
-
-  voiceTimer = setTimeout(() => { 
-    isVoicePlaying.value = false
-    voiceBubbleVisible.value = true
-  }, timeoutMs) 
-}
-
-// 新增：强制提前停止动效的方法
-const stopVoice = () => {
-  isVoicePlaying.value = false
-  clearVoiceStream()
   if (voiceTimer) {
     clearTimeout(voiceTimer)
     voiceTimer = null
   }
-  voiceBubbleVisible.value = !!voiceDisplayText.value
+  
+  // 如果后端传了准确时长，则转换为毫秒；否则按文案长度估算，保证动效可收敛
+  const estimatedSec = Math.max(2, Math.ceil(safeText.length / 4))
+  const timeoutMs = durationSec !== null ? (durationSec * 1000) : (estimatedSec * 1000)
+
+  voiceTimer = setTimeout(() => { 
+    isVoicePlaying.value = false
+    voiceBubbleVisible.value = true
+    voiceDisplayText.value = safeText
+    clearVoiceStream()
+    voiceTimer = null
+  }, timeoutMs) 
+}
+
+const speakWithBackendTts = async (text, voice = 'zh-CN-YunxiNeural') => {
+  const normalizedText = String(text || '').trim()
+  if (!normalizedText) return { duration: 0 }
+
+  const token = voiceRequestToken.value + 1
+  voiceRequestToken.value = token
+
+  playVoice(normalizedText)
+
+  try {
+    const data = await playTts({ text: normalizedText, voice })
+    if (token !== voiceRequestToken.value) return data
+
+    const durationSec = Number(data?.duration)
+    if (Number.isFinite(durationSec) && durationSec > 0) {
+      playVoice(normalizedText, durationSec)
+    }
+    return data
+  } catch (error) {
+    if (token === voiceRequestToken.value) {
+      stopVoice()
+    }
+    throw error
+  }
+}
+
+// 新增：强制提前停止动效的方法
+const stopVoice = () => {
+  voiceRequestToken.value += 1
+  isVoicePlaying.value = false
+  clearVoiceStream()
+  voiceDisplayText.value = voiceFullText.value || voiceDisplayText.value
+  if (voiceTimer) {
+    clearTimeout(voiceTimer)
+    voiceTimer = null
+  }
+  voiceBubbleVisible.value = true
 }
 
 // 供全局注入
 provide('playVoice', playVoice)
 provide('stopVoice', stopVoice)
+provide('speakWithBackendTts', speakWithBackendTts)
 
 onMounted(() => {
   updateSidebarClock()
@@ -247,11 +284,11 @@ onBeforeUnmount(() => {
 
   clearIdleTimer()
 
-  clearVoiceStream()
   if (voiceTimer) {
     clearTimeout(voiceTimer)
     voiceTimer = null
   }
+  clearVoiceStream()
 })
 </script>
 
