@@ -23,9 +23,9 @@
             AI 教练
           </span>
           <span :class="['text-xs tracking-wider transition-colors duration-300 mt-0.5', isPlaying ? 'text-neon-green font-medium' : 'text-white/50 uppercase']">
-            {{ isPlaying ? '说话中...' : '已播报，点击查看完整内容' }}
+            {{ collapsedMode ? '点击展开上次回复' : (isPlaying ? '说话中...' : '已播报，点击查看完整内容') }}
           </span>
-          <span v-if="speechText" class="text-xs mt-1 text-white/75 whitespace-pre-wrap break-words" :class="isExpanded ? 'max-h-[240px] overflow-y-auto pr-1' : 'line-clamp-4'">
+          <span v-if="speechText && !collapsedMode" class="text-xs mt-1 text-white/75 whitespace-pre-wrap break-words" :class="isExpanded ? 'max-h-[240px] overflow-y-auto pr-1' : 'line-clamp-4'">
             {{ speechText }}
           </span>
         </div>
@@ -44,7 +44,7 @@
 
 <script setup>
 import { Mic, AudioLines } from '@lucide/vue'
-import { defineProps } from 'vue'
+import { computed, defineProps } from 'vue'
 
 const emit = defineEmits(['toggleExpand'])
 
@@ -66,6 +66,8 @@ const props = defineProps({
     default: ''
   }
 })
+
+const collapsedMode = computed(() => !props.isPlaying && !props.isExpanded)
 </script>
 
 <style scoped>

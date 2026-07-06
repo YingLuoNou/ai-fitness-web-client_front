@@ -162,7 +162,7 @@ const handleGlobalPointerDown = (event) => {
   }
 
   voiceBubbleExpanded.value = false
-  if (!isVoicePlaying.value) {
+  if (!isVoicePlaying.value && !voiceDisplayText.value) {
     voiceBubbleVisible.value = false
   }
 }
