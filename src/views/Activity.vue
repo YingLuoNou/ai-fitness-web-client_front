@@ -204,7 +204,7 @@
         </div>
       </div>
 
-      <div class="w-[65%] glass-panel-light rounded-[3rem] flex flex-col relative shadow-2xl p-10 overflow-hidden">
+      <div class="w-[65%] rounded-[3rem] flex flex-col relative p-10 overflow-hidden border border-white/10 bg-transparent">
         
         <div class="flex-1 flex flex-col min-h-0">
           
