@@ -67,6 +67,11 @@
         </div>
 
         <div class="grid grid-cols-2 gap-4">
+          <button @click="goMyPlan" class="h-28 rounded-2xl bg-neon-green/15 border border-neon-green/30 hover:bg-neon-green/25 transition-all text-left px-5">
+            <p class="text-lg font-bold text-neon-green">我的计划</p>
+            <p class="text-sm text-gray-300 mt-2">查看当前 7 天计划并重新生成</p>
+          </button>
+
           <button @click="refreshProfile" :disabled="isLoadingProfile" class="h-28 rounded-2xl bg-white/10 border border-white/15 hover:bg-white/15 transition-all text-left px-5 disabled:opacity-60 disabled:cursor-not-allowed">
             <p class="text-lg font-bold">同步资料</p>
             <p class="text-sm text-gray-400 mt-2">从后端重新拉取账户信息</p>
@@ -384,6 +389,10 @@ const openSettingsDialog = () => {
 
 const closeSettingsDialog = () => {
   isSettingsDialogOpen.value = false
+}
+
+const goMyPlan = () => {
+  router.push('/my-plan')
 }
 
 const handlePhoneInput = () => {

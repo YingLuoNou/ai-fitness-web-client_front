@@ -16,6 +16,10 @@ export const fetchUserProfile = () => {
   return request('/api/user/profile/', { auth: true })
 }
 
+export const fetchCurrentPlan = () => {
+  return request('/api/plan/current/', { auth: true })
+}
+
 export const updateUserProfile = (payload) => {
   return request('/api/user/profile/', {
     method: 'PUT',
