@@ -74,3 +74,9 @@
     box-shadow: 0 0 20px rgba(50, 255, 126, 0.4);
   }
 }
+
+/* Activity 页性能模式：避免整体失焦/发灰 */
+body.activity-performance-mode #global-background > div {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}

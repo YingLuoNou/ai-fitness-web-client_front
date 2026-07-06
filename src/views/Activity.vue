@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full h-full flex flex-col relative text-white px-10 py-6">
+  <div class="activity-page w-full h-full flex flex-col relative text-white px-10 py-6">
     
     <header class="flex justify-between items-center mb-8 shrink-0 pl-2">
       <div>
@@ -683,17 +683,25 @@ watch(viewMode, (mode) => {
 })
 
 onMounted(() => {
+  document.body.classList.add('activity-performance-mode')
   fetchActivities()
   window.addEventListener('resize', handleResize)
 })
 
 onBeforeUnmount(() => {
+  document.body.classList.remove('activity-performance-mode')
   window.removeEventListener('resize', handleResize)
   if (chartInstance) chartInstance.dispose()
 })
 </script>
 
 <style scoped>
+.activity-page :deep(.glass-panel),
+.activity-page :deep(.glass-panel-light) {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
   height: 6px;
