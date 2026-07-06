@@ -56,90 +56,14 @@
       </div>
 
       <div class="col-span-7 glass-panel-light rounded-[2rem] p-6 flex flex-col gap-4">
-        <h3 class="text-2xl font-bold tracking-wider">安全与设备</h3>
-
-        <div class="rounded-2xl border border-neon-green/30 bg-neon-green/5 p-5">
-          <div class="flex items-start justify-between gap-4 mb-4">
-            <div>
-              <p class="text-lg font-bold text-white">用户设置</p>
-              <p class="text-sm text-gray-300 mt-1">可修改手机号、性别、身高、体重、出生日期与头像链接</p>
-            </div>
-            <span class="text-xs px-3 py-1 rounded-full border" :class="dirtyTagClass">
-              {{ isDirty ? '未保存' : '已同步' }}
-            </span>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs text-gray-400 mb-1">手机号</label>
-              <input
-                v-model="settingsForm.phone"
-                @input="handlePhoneInput"
-                inputmode="numeric"
-                type="text"
-                maxlength="11"
-                placeholder="请输入手机号"
-                class="w-full h-11 rounded-xl px-3 bg-white/5 border border-white/10 focus:border-neon-green/70 outline-none transition-all"
-              />
-              <p v-if="phoneValidationError" class="text-xs text-neon-red mt-1">{{ phoneValidationError }}</p>
-            </div>
-
-            <div>
-              <label class="block text-xs text-gray-400 mb-1">性别</label>
-              <div class="grid grid-cols-3 gap-2">
-                <button type="button" @click="settingsForm.gender = '男'" class="h-11 rounded-xl border text-sm transition-all"
-                  :class="settingsForm.gender === '男' ? 'bg-neon-green text-black border-neon-green' : 'bg-white/5 text-white border-white/10 hover:bg-white/10'">男</button>
-                <button type="button" @click="settingsForm.gender = '女'" class="h-11 rounded-xl border text-sm transition-all"
-                  :class="settingsForm.gender === '女' ? 'bg-neon-green text-black border-neon-green' : 'bg-white/5 text-white border-white/10 hover:bg-white/10'">女</button>
-                <button type="button" @click="settingsForm.gender = ''" class="h-11 rounded-xl border text-sm transition-all"
-                  :class="settingsForm.gender === '' ? 'bg-neon-green text-black border-neon-green' : 'bg-white/5 text-white border-white/10 hover:bg-white/10'">未设置</button>
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-xs text-gray-400 mb-1">身高（cm）</label>
-              <input v-model.number="settingsForm.height" type="number" min="80" max="260" placeholder="例如 170" class="w-full h-11 rounded-xl px-3 bg-white/5 border border-white/10 focus:border-neon-green/70 outline-none transition-all" />
-            </div>
-
-            <div>
-              <label class="block text-xs text-gray-400 mb-1">体重（kg）</label>
-              <input v-model.number="settingsForm.weight" type="number" min="20" max="300" placeholder="例如 65" class="w-full h-11 rounded-xl px-3 bg-white/5 border border-white/10 focus:border-neon-green/70 outline-none transition-all" />
-            </div>
-
-            <div>
-              <label class="block text-xs text-gray-400 mb-1">出生日期</label>
-              <input v-model="settingsForm.birthdate" type="date" class="w-full h-11 rounded-xl px-3 bg-white/5 border border-white/10 focus:border-neon-green/70 outline-none transition-all" />
-            </div>
-
-            <div>
-              <label class="block text-xs text-gray-400 mb-1">头像链接</label>
-              <input v-model.trim="settingsForm.avatar" type="text" placeholder="https://..." class="w-full h-11 rounded-xl px-3 bg-white/5 border border-white/10 focus:border-neon-green/70 outline-none transition-all" />
-              <p v-if="avatarValidationError" class="text-xs text-neon-red mt-1">{{ avatarValidationError }}</p>
-            </div>
-          </div>
-
-          <div class="mt-3 rounded-xl border border-white/10 bg-black/25 p-3 flex items-center gap-3">
-            <div class="w-14 h-14 rounded-full bg-white/10 border border-white/10 overflow-hidden flex items-center justify-center text-xs text-gray-400 shrink-0">
-              <img v-if="avatarPreviewUrl && !avatarPreviewFailed" :src="avatarPreviewUrl" alt="avatar-preview" class="w-full h-full object-cover" @error="avatarPreviewFailed = true" />
-              <span v-else>预览</span>
-            </div>
-            <div class="text-xs text-gray-300 min-w-0">
-              <p class="text-gray-400">头像预览</p>
-              <p v-if="avatarPreviewUrl && !avatarPreviewFailed" class="truncate mt-1">{{ avatarPreviewUrl }}</p>
-              <p v-else-if="avatarPreviewFailed" class="text-neon-orange mt-1">图片加载失败，请检查链接可访问性</p>
-              <p v-else class="mt-1">请输入有效的 http/https 图片链接</p>
-            </div>
-          </div>
-
-          <p v-if="settingsError" class="text-sm text-neon-red mt-3">{{ settingsError }}</p>
-
-          <div class="flex justify-end gap-3 mt-4">
-            <button @click="resetSettingsForm" :disabled="isSavingProfile" class="px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all disabled:opacity-60">重置</button>
-            <button @click="saveProfileSettings" :disabled="isSavingProfile || !isDirty" class="px-5 py-2 rounded-xl font-semibold transition-all"
-              :class="isSavingProfile || !isDirty ? 'bg-white/5 text-gray-500 border border-white/10 cursor-not-allowed' : 'btn-neon-primary'">
-              {{ isSavingProfile ? '保存中...' : '保存设置' }}
-            </button>
-          </div>
+        <div class="flex items-center justify-between">
+          <h3 class="text-2xl font-bold tracking-wider">安全与设备</h3>
+          <button
+            @click="openSettingsDialog"
+            class="h-11 px-5 rounded-xl border border-neon-green/40 bg-neon-green/15 text-neon-green font-semibold hover:bg-neon-green/25 transition-all"
+          >
+            用户设置
+          </button>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
@@ -192,6 +116,97 @@
         </div>
       </div>
     </section>
+
+    <div
+      v-if="isSettingsDialogOpen"
+      class="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm flex items-center justify-center p-6"
+      @click.self="closeSettingsDialog"
+    >
+      <div class="w-[900px] max-w-[92vw] rounded-[2rem] border border-white/15 bg-[#111317]/95 shadow-[0_30px_80px_rgba(0,0,0,.55)] p-6">
+        <div class="flex items-start justify-between gap-4 mb-5">
+          <div>
+            <p class="text-2xl font-bold text-white">用户设置</p>
+            <p class="text-sm text-gray-300 mt-1">单独窗口编辑个人信息，避免主界面布局拥挤</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-xs px-3 py-1 rounded-full border" :class="dirtyTagClass">{{ isDirty ? '未保存' : '已同步' }}</span>
+            <button @click="closeSettingsDialog" class="w-10 h-10 rounded-full border border-white/15 bg-white/5 hover:bg-white/10 transition-all">✕</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">手机号</label>
+            <input
+              v-model="settingsForm.phone"
+              @input="handlePhoneInput"
+              inputmode="numeric"
+              type="text"
+              maxlength="11"
+              placeholder="请输入手机号"
+              class="w-full h-11 rounded-xl px-3 bg-white/5 border border-white/10 focus:border-neon-green/70 outline-none transition-all"
+            />
+            <p v-if="phoneValidationError" class="text-xs text-neon-red mt-1">{{ phoneValidationError }}</p>
+          </div>
+
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">性别</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button type="button" @click="settingsForm.gender = '男'" class="h-11 rounded-xl border text-sm transition-all"
+                :class="settingsForm.gender === '男' ? 'bg-neon-green text-black border-neon-green' : 'bg-white/5 text-white border-white/10 hover:bg-white/10'">男</button>
+              <button type="button" @click="settingsForm.gender = '女'" class="h-11 rounded-xl border text-sm transition-all"
+                :class="settingsForm.gender === '女' ? 'bg-neon-green text-black border-neon-green' : 'bg-white/5 text-white border-white/10 hover:bg-white/10'">女</button>
+              <button type="button" @click="settingsForm.gender = ''" class="h-11 rounded-xl border text-sm transition-all"
+                :class="settingsForm.gender === '' ? 'bg-neon-green text-black border-neon-green' : 'bg-white/5 text-white border-white/10 hover:bg-white/10'">未设置</button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">身高（cm）</label>
+            <input v-model.number="settingsForm.height" type="number" min="80" max="260" placeholder="例如 170" class="w-full h-11 rounded-xl px-3 bg-white/5 border border-white/10 focus:border-neon-green/70 outline-none transition-all" />
+          </div>
+
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">体重（kg）</label>
+            <input v-model.number="settingsForm.weight" type="number" min="20" max="300" placeholder="例如 65" class="w-full h-11 rounded-xl px-3 bg-white/5 border border-white/10 focus:border-neon-green/70 outline-none transition-all" />
+          </div>
+
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">出生日期</label>
+            <input v-model="settingsForm.birthdate" type="date" class="w-full h-11 rounded-xl px-3 bg-white/5 border border-white/10 focus:border-neon-green/70 outline-none transition-all" />
+          </div>
+
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">头像链接</label>
+            <input v-model.trim="settingsForm.avatar" type="text" placeholder="https://..." class="w-full h-11 rounded-xl px-3 bg-white/5 border border-white/10 focus:border-neon-green/70 outline-none transition-all" />
+            <p v-if="avatarValidationError" class="text-xs text-neon-red mt-1">{{ avatarValidationError }}</p>
+          </div>
+        </div>
+
+        <div class="mt-3 rounded-xl border border-white/10 bg-black/25 p-3 flex items-center gap-3">
+          <div class="w-14 h-14 rounded-full bg-white/10 border border-white/10 overflow-hidden flex items-center justify-center text-xs text-gray-400 shrink-0">
+            <img v-if="avatarPreviewUrl && !avatarPreviewFailed" :src="avatarPreviewUrl" alt="avatar-preview" class="w-full h-full object-cover" @error="avatarPreviewFailed = true" />
+            <span v-else>预览</span>
+          </div>
+          <div class="text-xs text-gray-300 min-w-0">
+            <p class="text-gray-400">头像预览</p>
+            <p v-if="avatarPreviewUrl && !avatarPreviewFailed" class="truncate mt-1">{{ avatarPreviewUrl }}</p>
+            <p v-else-if="avatarPreviewFailed" class="text-neon-orange mt-1">图片加载失败，请检查链接可访问性</p>
+            <p v-else class="mt-1">请输入有效的 http/https 图片链接</p>
+          </div>
+        </div>
+
+        <p v-if="settingsError" class="text-sm text-neon-red mt-3">{{ settingsError }}</p>
+
+        <div class="flex justify-end gap-3 mt-5">
+          <button @click="resetSettingsForm" :disabled="isSavingProfile" class="px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all disabled:opacity-60">重置</button>
+          <button @click="saveProfileSettings" :disabled="isSavingProfile || !isDirty" class="px-5 py-2 rounded-xl font-semibold transition-all"
+            :class="isSavingProfile || !isDirty ? 'bg-white/5 text-gray-500 border border-white/10 cursor-not-allowed' : 'btn-neon-primary'">
+            {{ isSavingProfile ? '保存中...' : '保存设置' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -217,6 +232,7 @@ const profile = reactive({
 const isLoadingProfile = ref(false)
 const isSavingProfile = ref(false)
 const isFaceBusy = ref(false)
+const isSettingsDialogOpen = ref(false)
 const faceVideoRef = ref(null)
 const faceLoopActive = ref(false)
 
@@ -361,6 +377,15 @@ const resetSettingsForm = () => {
   settingsError.value = ''
 }
 
+const openSettingsDialog = () => {
+  settingsError.value = ''
+  isSettingsDialogOpen.value = true
+}
+
+const closeSettingsDialog = () => {
+  isSettingsDialogOpen.value = false
+}
+
 const handlePhoneInput = () => {
   settingsForm.phone = String(settingsForm.phone || '').replace(/\D/g, '').slice(0, 11)
 }
@@ -468,6 +493,7 @@ watch(() => settingsForm.avatar, () => {
     profile.birthdate = data.birthdate ?? ''
 
     applyProfileToSettingsForm()
+    isSettingsDialogOpen.value = false
 
     statusMessage.type = 'ok'
     statusMessage.text = '个人信息已更新'
