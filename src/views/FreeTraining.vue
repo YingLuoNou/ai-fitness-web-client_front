@@ -133,7 +133,9 @@ const startTraining = async () => {
         sessionId: data.session_id || data.id || '',
         sets: String(normalizedSets),
         reps: String(normalizedReps),
-        restSec: String(normalizedRestSeconds)
+        restSec: String(normalizedRestSeconds),
+        exercise: selectedExercises.value[0] || '',
+        exercises: selectedExercises.value.join(',')
       }
     })
   } catch (error) {

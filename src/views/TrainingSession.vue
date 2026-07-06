@@ -107,6 +107,9 @@ const coachTip = ref('保持核心收紧，动作速度均匀。')
 const runtimeMode = ref('windows_debug')
 const rosDebugMode = ref(true)
 const sessionRealtimeSourceMode = ref('simulated')
+const runtimeConfig = ref(null)
+const activeExerciseCode = ref('')
+const activeExerciseName = ref('')
 
 const perceivedExertion = ref(3)
 const errorCount = ref(0)
@@ -133,13 +136,71 @@ const lastRawRosRep = ref(0)
 const rosConn = shallowRef(null)
 const rosConnected = ref(false)
 const rosTopics = {
-  squatControl: null,
-  squatState: null,
-  squatRepCompleted: null,
-  squatErrors: null,
+  motionControl: null,
+  motionState: null,
+  motionRepCompleted: null,
+  motionErrors: null,
   heartControl: null,
   heartRate: null,
   heartSpo2: null
+}
+
+const parseQueryExerciseCodes = () => {
+  const codes = []
+  const single = String(route.query.exercise || '').trim()
+  if (single) codes.push(single)
+
+  const raw = route.query.exercises
+  if (Array.isArray(raw)) {
+    raw.forEach((item) => {
+      const code = String(item || '').trim()
+      if (code) codes.push(code)
+    })
+  } else if (typeof raw === 'string') {
+    raw.split(',').forEach((item) => {
+      const code = String(item || '').trim()
+      if (code) codes.push(code)
+    })
+  }
+
+  return [...new Set(codes)]
+}
+
+const resolveFallbackMotionTopics = (cfg) => {
+  const detectorList = Array.isArray(cfg?.action_detectors) ? cfg.action_detectors : []
+  const firstDetectorTopics = detectorList[0]?.topics
+  if (firstDetectorTopics && typeof firstDetectorTopics === 'object') {
+    return firstDetectorTopics
+  }
+
+  const legacyTopics = cfg?.topics?.squat
+  if (legacyTopics && typeof legacyTopics === 'object') {
+    return legacyTopics
+  }
+
+  return {
+    control: '',
+    state: '',
+    rep_completed: '',
+    errors: ''
+  }
+}
+
+const resolveActiveDetector = (cfg, preferredCodes = []) => {
+  const detectorList = Array.isArray(cfg?.action_detectors) ? cfg.action_detectors : []
+  const fallbackTopicCfg = resolveFallbackMotionTopics(cfg)
+  const candidates = preferredCodes
+    .map((item) => String(item || '').trim())
+    .filter((item) => !!item)
+
+  const detector = detectorList.find((item) => candidates.includes(String(item?.code || '')))
+    || detectorList[0]
+
+  const topicCfg = detector?.topics || fallbackTopicCfg
+  activeExerciseCode.value = String(detector?.code || candidates[0] || activeExerciseCode.value || '')
+  activeExerciseName.value = String(detector?.name_zh || detector?.name_en || activeExerciseCode.value)
+
+  return topicCfg
 }
 
 let fakeTimer = null
@@ -254,8 +315,8 @@ const enterRestPhase = () => {
 
   // 休息阶段暂停深蹲节点，避免误动作继续累计次数
   if (!rosDebugMode.value && rosConnected.value) {
-    // 仅停深蹲计数，心率/血氧继续采集
-    publishSquatControl(false)
+    // 仅停动作计数，心率/血氧继续采集
+    publishMotionControl(false)
   }
 
   coachTip.value = '组间休息中。'
@@ -267,7 +328,7 @@ const enterRestPhase = () => {
       syncStableSamplingByPhase('WORK')
 
       if (!rosDebugMode.value && rosConnected.value && !isPaused.value) {
-        publishSquatControl(true)
+        publishMotionControl(true)
       }
 
       coachTip.value = '休息结束，继续下一组。'
@@ -288,7 +349,7 @@ const beginEndSamplingThenFinish = () => {
 
   // 结束采样阶段：停止深蹲计数，保留心率血氧采集
   if (!rosDebugMode.value && rosConnected.value) {
-    publishSquatControl(false)
+    publishMotionControl(false)
   }
 
   coachTip.value = `目标已完成，请保持静止 ${END_SAMPLING_SECONDS} 秒，正在采集结束体征。`
@@ -309,13 +370,15 @@ const beginEndSamplingThenFinish = () => {
 const hydrateRuntimeConfig = async () => {
   try {
     const cfg = await fetchRosRuntimeConfig()
+    runtimeConfig.value = cfg
     runtimeMode.value = cfg?.runtime_mode || 'windows_debug'
     rosDebugMode.value = !!cfg?.debug_mode
     sessionRealtimeSourceMode.value = cfg?.session_realtime?.source_mode || 'simulated'
     poseStreamUrl.value = cfg?.active_profile?.mjpeg_stream_url || ''
     poseStreamError.value = false
 
-    const topicState = cfg?.topics?.squat?.state || '/squat/state'
+    const topicCfg = resolveActiveDetector(cfg, parseQueryExerciseCodes())
+    const topicState = topicCfg?.state || ''
     const topicHeartRate = cfg?.topics?.heart?.heart_rate || '/heart_sensor_node/heart_rate'
     const topicLlm = cfg?.topics?.llm?.output_string || '/rkllm/output_string'
 
@@ -324,14 +387,22 @@ const hydrateRuntimeConfig = async () => {
       debugMode: rosDebugMode.value,
       dataSource: rosDebugMode.value ? 'mock/debug' : 'real/ros',
       topics: {
+        exerciseCode: activeExerciseCode.value,
+        exerciseName: activeExerciseName.value,
+        control: topicCfg?.control,
         state: topicState,
+        repCompleted: topicCfg?.rep_completed,
+        errors: topicCfg?.errors,
         heartRate: topicHeartRate,
         llmOutput: topicLlm,
         poseImage: cfg?.topics?.pose_image || '/pose/image'
       },
       poseStreamUrl: poseStreamUrl.value
     })
+
+    return cfg
   } catch (error) {
+    runtimeConfig.value = null
     runtimeMode.value = 'windows_debug'
     rosDebugMode.value = true
     poseStreamUrl.value = ''
@@ -342,7 +413,7 @@ const hydrateRuntimeConfig = async () => {
       debugMode: rosDebugMode.value,
       dataSource: 'mock/debug',
       topics: {
-        state: '/squat/state',
+        state: '',
         heartRate: '/heart_sensor_node/heart_rate',
         llmOutput: '/rkllm/output_string',
         poseImage: '/pose/image'
@@ -350,53 +421,67 @@ const hydrateRuntimeConfig = async () => {
       poseStreamUrl: '',
       error
     })
+
+    return null
   }
 }
 
 const bindRosTopics = (cfg) => {
   if (!rosConn.value) return
   const topics = cfg?.topics || {}
-  const squatTopicCfg = topics.squat || {}
+  const motionTopicCfg = resolveActiveDetector(cfg, parseQueryExerciseCodes())
   const heartTopicCfg = topics.heart || {}
 
-  rosTopics.squatControl = new ROSLIB.Topic({
+  const motionControlName = String(motionTopicCfg.control || '').trim()
+  const motionStateName = String(motionTopicCfg.state || '').trim()
+  const motionRepCompletedName = String(motionTopicCfg.rep_completed || '').trim()
+  const motionErrorsName = String(motionTopicCfg.errors || '').trim()
+  const heartControlName = String(heartTopicCfg.control || '/heart_sensor_node/control').trim()
+  const heartRateName = String(heartTopicCfg.heart_rate || '/heart_sensor_node/heart_rate').trim()
+  const heartSpo2Name = String(heartTopicCfg.spo2 || '/heart_sensor_node/spo2').trim()
+
+  if (!motionControlName || !motionStateName || !motionRepCompletedName || !motionErrorsName) {
+    coachTip.value = '动作话题配置不完整，请检查 ros_runtime.yaml 的 action_detectors.topics。'
+  }
+
+  rosTopics.motionControl = motionControlName ? new ROSLIB.Topic({
     ros: rosConn.value,
-    name: squatTopicCfg.control || '/squat/control',
+    name: motionControlName,
     messageType: 'std_msgs/Bool'
-  })
-  rosTopics.squatState = new ROSLIB.Topic({
+  }) : null
+  rosTopics.motionState = motionStateName ? new ROSLIB.Topic({
     ros: rosConn.value,
-    name: squatTopicCfg.state || '/squat/state',
+    name: motionStateName,
     messageType: 'std_msgs/String'
-  })
-  rosTopics.squatRepCompleted = new ROSLIB.Topic({
+  }) : null
+  rosTopics.motionRepCompleted = motionRepCompletedName ? new ROSLIB.Topic({
     ros: rosConn.value,
-    name: squatTopicCfg.rep_completed || '/squat/rep_completed',
+    name: motionRepCompletedName,
     messageType: 'std_msgs/Int32'
-  })
-  rosTopics.squatErrors = new ROSLIB.Topic({
+  }) : null
+  rosTopics.motionErrors = motionErrorsName ? new ROSLIB.Topic({
     ros: rosConn.value,
-    name: squatTopicCfg.errors || '/squat/errors',
+    name: motionErrorsName,
     messageType: 'std_msgs/String'
-  })
+  }) : null
 
-  rosTopics.heartControl = new ROSLIB.Topic({
+  rosTopics.heartControl = heartControlName ? new ROSLIB.Topic({
     ros: rosConn.value,
-    name: heartTopicCfg.control || '/heart_sensor_node/control',
+    name: heartControlName,
     messageType: 'std_msgs/Bool'
-  })
-  rosTopics.heartRate = new ROSLIB.Topic({
+  }) : null
+  rosTopics.heartRate = heartRateName ? new ROSLIB.Topic({
     ros: rosConn.value,
-    name: heartTopicCfg.heart_rate || '/heart_sensor_node/heart_rate',
+    name: heartRateName,
     messageType: 'std_msgs/Float32'
-  })
-  rosTopics.heartSpo2 = new ROSLIB.Topic({
+  }) : null
+  rosTopics.heartSpo2 = heartSpo2Name ? new ROSLIB.Topic({
     ros: rosConn.value,
-    name: heartTopicCfg.spo2 || '/heart_sensor_node/spo2',
+    name: heartSpo2Name,
     messageType: 'std_msgs/Float32'
-  })
+  }) : null
 
-  rosTopics.squatRepCompleted.subscribe((msg) => {
+  rosTopics.motionRepCompleted?.subscribe((msg) => {
     const rawRep = Math.max(0, Math.floor(Number(msg?.data) || 0))
     if (!Number.isFinite(rawRep)) return
 
@@ -435,19 +520,19 @@ const bindRosTopics = (cfg) => {
     }
   })
 
-  rosTopics.heartRate.subscribe((msg) => {
+  rosTopics.heartRate?.subscribe((msg) => {
     if (typeof msg?.data === 'number') {
       metrics.heartRate = Math.max(0, Math.round(msg.data))
     }
   })
 
-  rosTopics.heartSpo2.subscribe((msg) => {
+  rosTopics.heartSpo2?.subscribe((msg) => {
     if (typeof msg?.data === 'number') {
       metrics.spo2 = Math.max(0, Math.min(100, Number(msg.data.toFixed(1))))
     }
   })
 
-  rosTopics.squatState.subscribe((msg) => {
+  rosTopics.motionState?.subscribe((msg) => {
     let text = ''
     try {
       const parsed = JSON.parse(msg?.data || '{}')
@@ -458,7 +543,7 @@ const bindRosTopics = (cfg) => {
     if (text && currentPhase.value !== 'REST') coachTip.value = text
   })
 
-  rosTopics.squatErrors.subscribe((msg) => {
+  rosTopics.motionErrors?.subscribe((msg) => {
     errorCount.value += 1
     try {
       const parsed = JSON.parse(msg?.data || '{}')
@@ -471,16 +556,16 @@ const bindRosTopics = (cfg) => {
 
 const publishRosControl = (enabled) => {
   try {
-    rosTopics.squatControl?.publish({ data: !!enabled })
+    rosTopics.motionControl?.publish({ data: !!enabled })
     rosTopics.heartControl?.publish({ data: !!enabled })
   } catch {
     // 忽略控制下发异常，前端仍可继续回退链路
   }
 }
 
-const publishSquatControl = (enabled) => {
+const publishMotionControl = (enabled) => {
   try {
-    rosTopics.squatControl?.publish({ data: !!enabled })
+    rosTopics.motionControl?.publish({ data: !!enabled })
   } catch {
     // 忽略控制下发异常
   }
@@ -513,9 +598,9 @@ const togglePause = () => {
 }
 
 const disconnectRos = () => {
-  try { rosTopics.squatState?.unsubscribe() } catch {}
-  try { rosTopics.squatRepCompleted?.unsubscribe() } catch {}
-  try { rosTopics.squatErrors?.unsubscribe() } catch {}
+  try { rosTopics.motionState?.unsubscribe() } catch {}
+  try { rosTopics.motionRepCompleted?.unsubscribe() } catch {}
+  try { rosTopics.motionErrors?.unsubscribe() } catch {}
   try { rosTopics.heartRate?.unsubscribe() } catch {}
   try { rosTopics.heartSpo2?.unsubscribe() } catch {}
 
@@ -587,6 +672,15 @@ const fetchSessionState = async () => {
 
   try {
     const data = await fetchTrainSessionState(sessionId.value)
+
+    if (runtimeConfig.value) {
+      const sessionExercises = Array.isArray(data?.exercises) ? data.exercises : []
+      const preferred = sessionExercises[0] || ''
+      if (preferred && preferred !== activeExerciseCode.value) {
+        resolveActiveDetector(runtimeConfig.value, sessionExercises)
+      }
+    }
+
     if (data.status === 'FINISHED') {
       stopPolling()
       disconnectRos()
@@ -799,8 +893,7 @@ const goHome = async (options = {}) => {
 
 onMounted(() => {
   ;(async () => {
-    const cfg = await fetchRosRuntimeConfig().catch(() => null)
-    await hydrateRuntimeConfig()
+    const cfg = await hydrateRuntimeConfig()
 
     sessionStartedAt.value = Date.now()
     phaseEnteredAt.value = Date.now()

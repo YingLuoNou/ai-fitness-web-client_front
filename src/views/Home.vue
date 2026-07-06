@@ -252,7 +252,14 @@ const startTodayPlan = async () => {
       statusMessage.text = '训练会话已创建，跳转中...'
       router.push({
         path: '/training-session',
-        query: { sessionId, sets: String(sets), reps: String(reps), restSec: String(restSec) }
+        query: {
+          sessionId,
+          sets: String(sets),
+          reps: String(reps),
+          restSec: String(restSec),
+          exercise: exercises[0] || '',
+          exercises: exercises.join(',')
+        }
       })
     } else {
       statusMessage.type = 'warning'
