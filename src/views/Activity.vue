@@ -80,10 +80,10 @@
           </div>
 
             <div v-if="viewMode === 'calendar'" class="flex flex-col h-full glass-panel rounded-[2rem] p-6 shadow-xl border border-white/10 relative overflow-hidden">
-              <div class="flex justify-between items-center mb-5 px-1">
+                <div class="flex justify-between items-center mb-5 px-1">
                 <div>
-                  <h3 class="text-2xl font-bold tracking-widest">{{ calendarMonthLabel }}</h3>
-                  <p class="text-xs text-gray-500 mt-1">点击日期查看当日详细训练表</p>
+                  <h3 class="text-2xl font-bold tracking-widest text-white">{{ calendarMonthLabel }}</h3>
+                  <p class="text-xs text-gray-300 mt-1">点击日期查看当日详细训练表</p>
                 </div>
                 <div class="flex items-center gap-2">
                   <button
@@ -106,7 +106,7 @@
                 </div>
               </div>
 
-              <div class="grid grid-cols-7 gap-2 mb-3 text-center text-gray-500 font-bold text-sm tracking-wider">
+              <div class="grid grid-cols-7 gap-2 mb-3 text-center text-gray-300 font-bold text-sm tracking-wider">
                 <div v-for="w in ['一','二','三','四','五','六','日']" :key="w">{{ w }}</div>
               </div>
 
@@ -153,7 +153,7 @@
                         <td class="py-2 text-right font-mono">{{ formatRecordDuration(item) }}</td>
                       </tr>
                       <tr v-if="selectedDateRecords.length === 0">
-                        <td colspan="4" class="py-5 text-center text-gray-500">当天暂无训练记录</td>
+                        <td colspan="4" class="py-5 text-center text-gray-300">当天暂无训练记录</td>
                       </tr>
                     </tbody>
                   </table>
@@ -166,7 +166,7 @@
         <div class="shrink-0 rounded-[2rem] bg-black/30 border border-white/10 p-5">
           <div class="flex items-center gap-2 mb-3 px-1">
             <MessageSquare class="w-4 h-4 text-ai-start" />
-            <span class="text-sm font-bold text-gray-300 tracking-widest">向 AI 教练提问</span>
+            <span class="text-sm font-bold text-white tracking-widest">向 AI 教练提问</span>
           </div>
 
           <div class="flex gap-2 mb-3 overflow-x-auto pb-1 custom-scrollbar">
@@ -227,11 +227,11 @@
               </div>
               <div class="flex gap-4">
                 <div class="text-center bg-black/20 px-5 py-3 rounded-2xl border border-white/5 shadow-inner">
-                  <p class="text-gray-500 text-xs tracking-widest mb-1">RPE 疲劳度</p>
+                  <p class="text-gray-300 text-xs tracking-widest mb-1">RPE 疲劳度</p>
                   <p class="text-3xl font-mono text-white">{{ selectedRecord.perceived_exertion || '-' }}<span class="text-sm text-gray-500 ml-1">/10</span></p>
                 </div>
                 <div class="text-center bg-black/20 px-5 py-3 rounded-2xl border border-white/5 shadow-inner">
-                  <p class="text-gray-500 text-xs tracking-widest mb-1">AI 动作评分</p>
+                  <p class="text-gray-300 text-xs tracking-widest mb-1">AI 动作评分</p>
                   <p class="text-3xl font-mono text-neon-green font-bold">{{ selectedRecord.quality_score || '-' }}<span class="text-sm text-gray-500 ml-1">分</span></p>
                 </div>
               </div>
@@ -262,10 +262,10 @@
 
               <div class="rounded-[2rem] bg-black/30 border border-white/5 flex flex-col p-6 shrink-0 shadow-inner">
                 <div class="flex justify-between items-center mb-6">
-                   <h4 class="text-lg font-bold text-gray-300 flex items-center gap-2">
+                   <h4 class="text-lg font-bold text-white flex items-center gap-2">
                      <HeartPulse class="w-5 h-5 text-neon-red" /> 生理体征曲线
                    </h4>
-                   <p class="text-sm text-gray-500">共采集 {{ selectedRecord.sensor_data_series?.length || 0 }} 组关键数据</p>
+                   <p class="text-sm text-gray-300">共采集 {{ selectedRecord.sensor_data_series?.length || 0 }} 组关键数据</p>
                 </div>
                 
                 <div v-if="selectedRecord.sensor_data_series && selectedRecord.sensor_data_series.length > 0" class="flex gap-6 mb-6">
@@ -273,14 +273,14 @@
                       <span class="text-gray-400 font-medium">平均心率</span>
                       <p class="text-2xl font-mono text-neon-red font-bold">
                         {{ Math.round(selectedRecord.sensor_data_series.reduce((sum, item) => sum + item.heart_rate, 0) / selectedRecord.sensor_data_series.length) }}
-                        <span class="text-sm text-gray-500 font-normal">bpm</span>
+                        <span class="text-sm text-gray-300 font-normal">bpm</span>
                       </p>
                    </div>
                    <div class="flex-1 bg-white/5 p-4 rounded-xl border border-white/5 flex justify-between items-center">
                       <span class="text-gray-400 font-medium">平均血氧</span>
                       <p class="text-2xl font-mono text-neon-green font-bold">
                         {{ (selectedRecord.sensor_data_series.reduce((sum, item) => sum + item.spo2, 0) / selectedRecord.sensor_data_series.length).toFixed(1) }}
-                        <span class="text-sm text-gray-500 font-normal">%</span>
+                        <span class="text-sm text-gray-300 font-normal">%</span>
                       </p>
                    </div>
                 </div>
@@ -289,7 +289,7 @@
                   <div ref="chartRef" class="absolute inset-0"></div>
                   <div v-if="!selectedRecord.sensor_data_series || selectedRecord.sensor_data_series.length === 0" class="absolute inset-0 flex flex-col items-center justify-center bg-black/35 z-10 pointer-events-none">
                     <ActivityIcon class="w-10 h-10 text-gray-600 mb-2 opacity-50" stroke-width="1.5" />
-                    <p class="text-sm text-gray-500">本次训练未采集到体征序列数据</p>
+                    <p class="text-sm text-gray-300">本次训练未采集到体征序列数据</p>
                   </div>
                 </div>
               </div>
@@ -683,25 +683,17 @@ watch(viewMode, (mode) => {
 })
 
 onMounted(() => {
-  document.body.classList.add('activity-performance-mode')
   fetchActivities()
   window.addEventListener('resize', handleResize)
 })
 
 onBeforeUnmount(() => {
-  document.body.classList.remove('activity-performance-mode')
   window.removeEventListener('resize', handleResize)
   if (chartInstance) chartInstance.dispose()
 })
 </script>
 
 <style scoped>
-.activity-page :deep(.glass-panel),
-.activity-page :deep(.glass-panel-light) {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
   height: 6px;

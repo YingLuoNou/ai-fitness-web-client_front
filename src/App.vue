@@ -32,9 +32,9 @@
           <button 
             @click="$router.push('/activity')"
             class="w-full flex items-center gap-4 px-6 py-5 rounded-2xl font-bold text-xl transition-all"
-            :class="$route.path === '/activity' ? 'bg-white/10 border border-white/5 text-neon-orange shadow-lg' : 'text-gray-400 hover:bg-white/5 hover:text-white group'"
+            :class="$route.path === '/activity' ? 'bg-neon-orange/20 border border-neon-orange/40 text-white shadow-[0_0_16px_rgba(255,159,67,0.25)]' : 'text-gray-400 hover:bg-white/5 hover:text-white group'"
           >
-            <Activity class="w-7 h-7 transition-colors" :class="$route.path === '/activity' ? '' : 'text-gray-500 group-hover:text-neon-orange'" :stroke-width="$route.path === '/activity' ? 2.5 : 2" />
+            <Activity class="w-7 h-7 transition-colors" :class="$route.path === '/activity' ? 'text-neon-orange' : 'text-gray-500 group-hover:text-neon-orange'" :stroke-width="$route.path === '/activity' ? 2.5 : 2" />
             <span>运动</span>
           </button>
 
