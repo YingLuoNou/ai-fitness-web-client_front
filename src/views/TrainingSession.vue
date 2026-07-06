@@ -39,7 +39,12 @@
           <p class="text-2xl font-bold mt-1">{{ coachTip }}</p>
         </div>
         <div class="flex gap-3">
-          <button class="px-5 py-3 rounded-xl bg-white/10 border border-white/20 hover:bg-white/15">暂停</button>
+          <button
+            @click="togglePause"
+            class="px-5 py-3 rounded-xl bg-white/10 border border-white/20 hover:bg-white/15"
+          >
+            {{ isPaused ? '继续' : '暂停' }}
+          </button>
           <button @click="goHome" class="px-5 py-3 rounded-xl bg-neon-red/30 border border-neon-red/50 hover:bg-neon-red/40">结束</button>
         </div>
       </div>
@@ -67,7 +72,9 @@ const totalSets = ref(Number(route.query.sets) || 3)
 const currentSet = ref(1)
 const repsPerSet = ref(Number(route.query.reps) || 20)
 const totalTargetReps = ref(totalSets.value * repsPerSet.value)
+const restSeconds = ref(Math.max(1, Number(route.query.restSec) || 45))
 const currentRep = ref(0)
+const isPaused = ref(false)
 const coachTip = ref('保持核心收紧，动作速度均匀。')
 const runtimeMode = ref('windows_debug')
 const rosDebugMode = ref(true)
@@ -91,6 +98,8 @@ const stableSampling = reactive({
   samples: []
 })
 const timeSeriesPayload = ref([])
+const rosRepOffset = ref(0)
+const lastRawRosRep = ref(0)
 
 // ROS 实时链路（实机模式）
 const rosConn = shallowRef(null)
@@ -108,6 +117,7 @@ const rosTopics = {
 let fakeTimer = null
 let pollTimer = null
 let ingestTimer = null
+let restTimer = null
 const isFinishing = ref(false)
 
 const phaseLabelMap = {
@@ -122,6 +132,28 @@ const onPoseStreamLoaded = () => {
 
 const onPoseStreamError = () => {
   poseStreamError.value = true
+}
+
+const clearRestTimer = () => {
+  if (restTimer) {
+    clearTimeout(restTimer)
+    restTimer = null
+  }
+}
+
+const enterRestPhase = () => {
+  clearRestTimer()
+  currentPhase.value = 'REST'
+  const sec = Math.max(1, Number(restSeconds.value) || 45)
+  coachTip.value = `本组完成，休息 ${sec} 秒后开始下一组。`
+
+  restTimer = setTimeout(() => {
+    if (currentPhase.value === 'REST') {
+      currentPhase.value = 'WORK'
+      coachTip.value = '休息结束，继续下一组。'
+    }
+    restTimer = null
+  }, sec * 1000)
 }
 
 const hydrateRuntimeConfig = async () => {
@@ -215,8 +247,33 @@ const bindRosTopics = (cfg) => {
   })
 
   rosTopics.squatRepCompleted.subscribe((msg) => {
-    if (typeof msg?.data === 'number') {
-      currentRep.value = Math.max(0, Math.floor(msg.data))
+    const rawRep = Math.max(0, Math.floor(Number(msg?.data) || 0))
+    if (!Number.isFinite(rawRep)) return
+
+    // 兼容节点重启/停用后计数从 0 重新开始的场景
+    if (rawRep < lastRawRosRep.value && currentRep.value > 0) {
+      rosRepOffset.value = currentRep.value
+    }
+    lastRawRosRep.value = rawRep
+
+    const incomingRep = rosRepOffset.value + rawRep
+    if (incomingRep < currentRep.value) return
+
+    currentRep.value = Math.min(totalTargetReps.value, incomingRep)
+
+    const eachSet = Math.max(1, repsPerSet.value)
+    const completedSets = Math.floor(currentRep.value / eachSet)
+    currentSet.value = Math.min(totalSets.value, Math.max(1, completedSets + 1))
+
+    const isSetBoundary = currentRep.value > 0
+      && currentRep.value < totalTargetReps.value
+      && (currentRep.value % eachSet === 0)
+
+    if (isSetBoundary) {
+      enterRestPhase()
+    } else {
+      clearRestTimer()
+      currentPhase.value = 'WORK'
     }
   })
 
@@ -237,13 +294,10 @@ const bindRosTopics = (cfg) => {
     try {
       const parsed = JSON.parse(msg?.data || '{}')
       text = parsed?.msg || ''
-      const code = Number(parsed?.code)
-      if (code === 0) currentPhase.value = 'WORK'
-      else if (code === 2) currentPhase.value = 'REST'
     } catch {
       text = msg?.data || ''
     }
-    if (text) coachTip.value = text
+    if (text && currentPhase.value !== 'REST') coachTip.value = text
   })
 
   rosTopics.squatErrors.subscribe((msg) => {
@@ -263,6 +317,30 @@ const publishRosControl = (enabled) => {
     rosTopics.heartControl?.publish({ data: !!enabled })
   } catch {
     // 忽略控制下发异常，前端仍可继续回退链路
+  }
+}
+
+const togglePause = () => {
+  if (rosDebugMode.value) {
+    isPaused.value = !isPaused.value
+    coachTip.value = isPaused.value ? '训练已暂停。' : '训练已继续，请保持动作标准。'
+    return
+  }
+
+  if (!rosConnected.value) {
+    coachTip.value = 'ROS 未连接，无法暂停/继续。'
+    return
+  }
+
+  if (isPaused.value) {
+    publishRosControl(true)
+    isPaused.value = false
+    coachTip.value = '训练已继续，请保持动作标准。'
+  } else {
+    clearRestTimer()
+    publishRosControl(false)
+    isPaused.value = true
+    coachTip.value = '训练已暂停。'
   }
 }
 
@@ -289,6 +367,9 @@ const connectRosRealtime = (cfg) => {
     rosConn.value = new ROSLIB.Ros({ url: rosbridgeUrl })
     rosConn.value.on('connection', () => {
       rosConnected.value = true
+      isPaused.value = false
+      rosRepOffset.value = 0
+      lastRawRosRep.value = 0
       try {
         bindRosTopics(cfg)
       } catch (error) {
@@ -344,11 +425,16 @@ const fetchSessionState = async () => {
       return
     }
 
-    metrics.heartRate = data.heart_rate ?? metrics.heartRate
-    metrics.spo2 = data.spo2 ?? metrics.spo2
-    currentRep.value = data.current_rep ?? currentRep.value
-    currentSet.value = data.current_set ?? currentSet.value
+    const rosAuthoritative = !rosDebugMode.value
+
     totalSets.value = data.total_sets ?? totalSets.value
+
+    if (!rosAuthoritative) {
+      metrics.heartRate = data.heart_rate ?? metrics.heartRate
+      metrics.spo2 = data.spo2 ?? metrics.spo2
+      currentRep.value = data.current_rep ?? currentRep.value
+      currentSet.value = data.current_set ?? currentSet.value
+    }
 
     if (data.reps_per_set != null) {
       repsPerSet.value = Math.max(1, Number(data.reps_per_set) || repsPerSet.value)
@@ -365,10 +451,19 @@ const fetchSessionState = async () => {
       repsPerSet.value = Math.max(1, Math.ceil(totalTargetReps.value / totalSets.value))
     }
 
-    coachTip.value = data.coach_message || phaseLabelMap[data.phase] || data.tip || coachTip.value
+    if (!rosAuthoritative || data.phase === 'END') {
+      coachTip.value = data.coach_message || phaseLabelMap[data.phase] || data.tip || coachTip.value
+    }
 
-    const incomingPhase = data.phase || currentPhase.value
+    let incomingPhase = currentPhase.value
+    if (!rosAuthoritative) {
+      incomingPhase = data.phase || currentPhase.value
+    } else if (data.phase === 'END') {
+      incomingPhase = 'END'
+    }
+
     if (incomingPhase !== currentPhase.value) {
+      clearRestTimer()
       currentPhase.value = incomingPhase
       phaseEnteredAt.value = Date.now()
       if (incomingPhase === 'REST' || incomingPhase === 'END') {
@@ -444,7 +539,9 @@ const stopPolling = () => {
 
 const ingestRealtimeState = async () => {
   if (!sessionId.value) return
-  if (sessionRealtimeSourceMode.value !== 'client_relay') return
+  if (rosDebugMode.value) return
+  if (!rosConnected.value) return
+  if (isPaused.value) return
 
   const progress = totalTargetReps.value > 0
     ? Math.max(0, Math.min(100, Number(((currentRep.value / totalTargetReps.value) * 100).toFixed(1))))
@@ -467,7 +564,7 @@ const ingestRealtimeState = async () => {
 
 const startRealtimeIngest = () => {
   if (!sessionId.value) return
-  if (sessionRealtimeSourceMode.value !== 'client_relay') return
+  if (rosDebugMode.value) return
   stopRealtimeIngest()
   ingestTimer = setInterval(ingestRealtimeState, 1000)
 }
@@ -518,7 +615,12 @@ const finishSession = async () => {
 }
 
 const goHome = async () => {
+  isPaused.value = false
+  stopPolling()
+  stopRealtimeIngest()
+  publishRosControl(false)
   await finishSession()
+  disconnectRos()
   router.push('/home')
 }
 
@@ -551,6 +653,7 @@ onBeforeUnmount(() => {
   stopMockData()
   stopPolling()
   stopRealtimeIngest()
+  clearRestTimer()
   disconnectRos()
   if (stopVoice) stopVoice()
 })
