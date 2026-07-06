@@ -2,9 +2,7 @@
   <div class="flex h-screen w-screen overflow-hidden bg-kiosk-bg text-white font-sans">
     <template v-if="isTrainingFullscreen">
       <router-view v-slot="{ Component }">
-        <transition name="fade" mode="out-in">
-          <component :is="Component" />
-        </transition>
+        <component :is="Component" />
       </router-view>
     </template>
 
@@ -15,8 +13,8 @@
 
       <aside class="z-10 flex w-[280px] flex-col justify-between glass-panel border-y-0 border-l-0">
         <div class="p-8 pb-4">
-          <h1 class="text-4xl font-bold tracking-tighter">{{ sidebarTime }}</h1>
-          <p class="text-sm text-gray-400 font-medium mt-1">{{ sidebarDate }}</p>
+          <h1 ref="sidebarTimeEl" class="text-4xl font-bold tracking-tighter">--:--</h1>
+          <p ref="sidebarDateEl" class="text-sm text-gray-400 font-medium mt-1">--</p>
         </div>
 
         <nav class="flex-1 px-4 py-8 space-y-4">
@@ -60,9 +58,7 @@
       <main class="relative z-10 flex-1 p-8 overflow-hidden">
         <div class="h-full w-full rounded-[40px] glass-panel-light relative overflow-hidden">
           <router-view v-slot="{ Component }">
-            <transition name="fade" mode="out-in">
-              <component :is="Component" />
-            </transition>
+            <component :is="Component" />
           </router-view>
         </div>
       </main>
@@ -85,20 +81,27 @@ const isTrainingFullscreen = computed(() => route.path === '/training-session')
 const IDLE_TIMEOUT_MS = 2 * 60 * 1000
 let idleTimer = null
 
-const sidebarTime = ref('--:--')
-const sidebarDate = ref('--')
+const sidebarTimeEl = ref(null)
+const sidebarDateEl = ref(null)
 let clockTimer = null
 
 const updateSidebarClock = () => {
   const now = new Date()
-  sidebarTime.value = now.toLocaleTimeString('zh-CN', {
+  const sidebarTime = now.toLocaleTimeString('zh-CN', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false
   })
   const weekday = now.toLocaleDateString('zh-CN', { weekday: 'long' })
   const monthDay = now.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
-  sidebarDate.value = `${weekday}，${monthDay}`
+  const sidebarDate = `${weekday}，${monthDay}`
+
+  if (sidebarTimeEl.value) {
+    sidebarTimeEl.value.textContent = sidebarTime
+  }
+  if (sidebarDateEl.value) {
+    sidebarDateEl.value.textContent = sidebarDate
+  }
 }
 
 const isVoicePlaying = ref(false)
@@ -190,7 +193,7 @@ provide('stopVoice', stopVoice)
 
 onMounted(() => {
   updateSidebarClock()
-  clockTimer = setInterval(updateSidebarClock, 1000)
+  clockTimer = setInterval(updateSidebarClock, 15000)
 
   window.addEventListener('pointerdown', handleUserActivity)
   window.addEventListener('keydown', handleUserActivity)
@@ -226,10 +229,4 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.fade-enter-active, .fade-leave-active {
-  transition: opacity 0.5s ease;
-}
-.fade-enter-from, .fade-leave-to {
-  opacity: 0;
-}
 </style>
