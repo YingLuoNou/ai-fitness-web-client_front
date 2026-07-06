@@ -204,7 +204,7 @@
         </div>
       </div>
 
-      <div class="w-[65%] rounded-[3rem] flex flex-col relative p-10 overflow-hidden border border-white/10 bg-transparent">
+      <div class="w-[65%] glass-panel-light rounded-[3rem] flex flex-col relative shadow-2xl p-10 overflow-hidden">
         
         <div class="flex-1 flex flex-col min-h-0">
           
@@ -238,8 +238,8 @@
             </div>
 
             <div class="flex-1 overflow-y-auto custom-scrollbar pr-4 mt-6 flex flex-col gap-6 pb-2 relative">
-              <div v-if="isDetailLoading" class="absolute inset-0 z-20 rounded-2xl bg-black/25 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
-                <div class="flex items-center gap-2 text-sm text-gray-200 bg-black/40 px-4 py-2 rounded-full border border-white/10">
+              <div v-if="isDetailLoading" class="absolute top-2 right-2 z-20 pointer-events-none">
+                <div class="flex items-center gap-2 text-sm text-gray-200 bg-black/50 px-4 py-2 rounded-full border border-white/10 shadow-lg backdrop-blur-sm">
                   <Loader2 class="w-4 h-4 animate-spin" />
                   加载详情中
                 </div>

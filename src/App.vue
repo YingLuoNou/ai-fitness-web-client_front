@@ -58,10 +58,7 @@
       </aside>
 
       <main class="relative z-10 flex-1 p-8 overflow-hidden">
-        <div
-          class="h-full w-full rounded-[40px] relative overflow-hidden"
-          :class="route.path === '/activity' ? 'bg-transparent border border-white/10' : 'glass-panel-light'"
-        >
+        <div class="h-full w-full rounded-[40px] glass-panel-light relative overflow-hidden">
           <router-view v-slot="{ Component }">
             <transition name="fade" mode="out-in">
               <component :is="Component" :key="route.path" />
