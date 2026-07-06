@@ -27,14 +27,15 @@
 
     <div class="flex-1 flex gap-8 min-h-0">
       
-      <div class="w-[35%] flex flex-col h-full overflow-hidden">
+      <div class="w-[35%] flex flex-col h-full overflow-hidden gap-5">
         
-        <div v-if="isLoading" class="flex justify-center py-20">
-          <Loader2 class="w-12 h-12 text-neon-green animate-spin" />
-        </div>
+        <div class="flex-1 min-h-0">
+          <div v-if="isLoading" class="flex justify-center py-20">
+            <Loader2 class="w-12 h-12 text-neon-green animate-spin" />
+          </div>
 
-        <template v-else>
-          <div v-if="viewMode === 'list'" class="flex flex-col gap-4 overflow-y-auto pr-4 custom-scrollbar pb-4 h-full">
+          <template v-else>
+            <div v-if="viewMode === 'list'" class="flex flex-col gap-4 overflow-y-auto pr-4 custom-scrollbar pb-4 h-full">
             <div 
               v-for="record in activities" :key="record.id"
               @click="selectRecord(record.id)"
@@ -78,35 +79,129 @@
             </div>
           </div>
 
-          <div v-if="viewMode === 'calendar'" class="flex flex-col h-full glass-panel rounded-[2rem] p-6 shadow-xl border border-white/10 relative overflow-hidden">
-             <div class="flex justify-between items-center mb-6 px-2">
-               <h3 class="text-2xl font-bold tracking-widest">本月</h3>
-               <span class="text-neon-green font-bold bg-neon-green/10 px-4 py-1 rounded-full border border-neon-green/20 text-sm">
-                 {{ activities.length }} 次训练
-               </span>
-             </div>
-             
-             <div class="grid grid-cols-7 gap-2 mb-4 text-center text-gray-500 font-bold text-sm tracking-wider">
-               <div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div><div>日</div>
-             </div>
-             
-             <div class="grid grid-cols-7 gap-3">
-               <div v-for="blank in 2" :key="'blank-'+blank" class="aspect-square"></div>
-               <div 
-                 v-for="day in calendarDays" :key="day.date"
-                 @click="day.record ? selectRecord(day.record.id) : null"
-                 class="aspect-square rounded-2xl flex flex-col items-center justify-center relative transition-all duration-300"
-                 :class="[
-                   day.record ? 'cursor-pointer hover:scale-105 shadow-lg' : 'opacity-40 cursor-not-allowed',
-                   selectedRecordId === day.record?.id ? 'bg-neon-green text-black font-black scale-105' : (day.record ? 'bg-white/10 hover:bg-white/20 text-white font-bold border border-white/10' : 'bg-transparent text-gray-500')
-                 ]"
-               >
-                 <span class="text-lg z-10">{{ day.date }}</span>
-                 <div v-if="day.record && selectedRecordId !== day.record.id" class="w-1.5 h-1.5 rounded-full bg-neon-green mt-1 absolute bottom-2"></div>
-               </div>
-             </div>
+            <div v-if="viewMode === 'calendar'" class="flex flex-col h-full glass-panel rounded-[2rem] p-6 shadow-xl border border-white/10 relative overflow-hidden">
+              <div class="flex justify-between items-center mb-5 px-1">
+                <div>
+                  <h3 class="text-2xl font-bold tracking-widest">{{ calendarMonthLabel }}</h3>
+                  <p class="text-xs text-gray-500 mt-1">点击日期查看当日详细训练表</p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button
+                    @click="changeCalendarMonth(-1)"
+                    class="w-8 h-8 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-gray-300 flex items-center justify-center transition"
+                    title="上月"
+                  >
+                    <ChevronLeft class="w-4 h-4" />
+                  </button>
+                  <button
+                    @click="changeCalendarMonth(1)"
+                    class="w-8 h-8 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-gray-300 flex items-center justify-center transition"
+                    title="下月"
+                  >
+                    <ChevronRight class="w-4 h-4" />
+                  </button>
+                  <span class="text-neon-green font-bold bg-neon-green/10 px-4 py-1 rounded-full border border-neon-green/20 text-sm">
+                    {{ activities.length }} 次训练
+                  </span>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-7 gap-2 mb-3 text-center text-gray-500 font-bold text-sm tracking-wider">
+                <div v-for="w in ['一','二','三','四','五','六','日']" :key="w">{{ w }}</div>
+              </div>
+
+              <div class="grid grid-cols-7 gap-2 mb-4">
+                <div
+                  v-for="cell in calendarGrid"
+                  :key="cell.key"
+                  class="aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all duration-200"
+                  :class="[
+                    !cell.dateKey ? 'opacity-30 cursor-not-allowed' : '',
+                    cell.dateKey && cell.count > 0 ? 'cursor-pointer border border-white/10 bg-white/5 hover:bg-white/10' : '',
+                    cell.dateKey && cell.count === 0 ? 'cursor-pointer border border-white/5 text-gray-500 hover:bg-white/5' : '',
+                    cell.dateKey && selectedCalendarDate === cell.dateKey ? 'bg-neon-green text-black font-black border-neon-green shadow-[0_0_12px_rgba(50,255,126,0.35)]' : ''
+                  ]"
+                  @click="cell.dateKey ? handleCalendarDayClick(cell) : null"
+                >
+                  <span class="text-sm z-10">{{ cell.dayNumber || '' }}</span>
+                  <span v-if="cell.count > 0" class="text-[10px] mt-1 px-1.5 py-0.5 rounded-full" :class="selectedCalendarDate === cell.dateKey ? 'bg-black/20 text-black' : 'bg-neon-green/20 text-neon-green'">
+                    {{ cell.count }} 次
+                  </span>
+                </div>
+              </div>
+
+              <div class="mt-1 rounded-2xl bg-black/25 border border-white/10 p-4 min-h-0 flex-1 flex flex-col">
+                <div class="flex items-center justify-between mb-3">
+                  <h4 class="text-sm font-bold text-gray-300 tracking-wider">当日训练明细</h4>
+                  <span class="text-xs text-gray-400">{{ selectedCalendarDateLabel }}</span>
+                </div>
+                <div class="overflow-auto custom-scrollbar pr-1 flex-1">
+                  <table class="w-full text-xs">
+                    <thead class="text-gray-400 border-b border-white/10 sticky top-0 bg-black/70 backdrop-blur">
+                      <tr>
+                        <th class="text-left py-2">时间</th>
+                        <th class="text-left py-2">动作</th>
+                        <th class="text-right py-2">次数</th>
+                        <th class="text-right py-2">时长</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="item in selectedDateRecords" :key="item.id" class="border-b border-white/5 hover:bg-white/5 cursor-pointer" @click="selectRecord(item.id)">
+                        <td class="py-2">{{ formatRecordTime(item.start_time) }}</td>
+                        <td class="py-2">{{ getActivityName(item) }}</td>
+                        <td class="py-2 text-right font-mono">{{ item.total_reps }}</td>
+                        <td class="py-2 text-right font-mono">{{ formatRecordDuration(item) }}</td>
+                      </tr>
+                      <tr v-if="selectedDateRecords.length === 0">
+                        <td colspan="4" class="py-5 text-center text-gray-500">当天暂无训练记录</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div class="shrink-0 rounded-[2rem] bg-black/30 border border-white/10 p-5">
+          <div class="flex items-center gap-2 mb-3 px-1">
+            <MessageSquare class="w-4 h-4 text-ai-start" />
+            <span class="text-sm font-bold text-gray-300 tracking-widest">向 AI 教练提问</span>
           </div>
-        </template>
+
+          <div class="flex gap-2 mb-3 overflow-x-auto pb-1 custom-scrollbar">
+            <button
+              v-for="(chip, idx) in quickQuestions" :key="idx"
+              @click="sendAiMessage(chip)"
+              class="whitespace-nowrap px-3 py-2 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-gray-300 hover:bg-white/10 hover:text-white transition-all shadow-sm"
+            >
+              {{ chip }}
+            </button>
+          </div>
+
+          <div class="relative flex items-center">
+            <div class="absolute left-4 w-8 h-8 rounded-full bg-gradient-to-tr from-ai-start to-ai-end flex items-center justify-center shadow-lg pointer-events-none">
+              <Mic class="w-4 h-4 text-white" />
+            </div>
+            <input
+              v-model="chatInput"
+              @keyup.enter="sendAiMessage(chatInput)"
+              type="text"
+              placeholder="输入你的问题"
+              class="w-full h-12 bg-black/50 border border-white/10 rounded-full pl-14 pr-14 text-sm text-white outline-none focus:border-neon-green/50 transition-all shadow-inner placeholder-gray-500"
+              :disabled="isChatting"
+            >
+            <button
+              @click="sendAiMessage(chatInput)"
+              :disabled="!chatInput || isChatting"
+              class="absolute right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 shadow-md"
+              :class="chatInput && !isChatting ? 'bg-neon-green text-black hover:scale-105' : 'bg-white/10 text-gray-500'"
+            >
+              <Loader2 v-if="isChatting" class="w-4 h-4 animate-spin" />
+              <Send v-else class="w-4 h-4 ml-0.5" />
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="w-[65%] glass-panel-light rounded-[3rem] flex flex-col relative shadow-2xl p-10 overflow-hidden">
@@ -142,7 +237,13 @@
               </div>
             </div>
 
-            <div class="flex-1 overflow-y-auto custom-scrollbar pr-4 mt-6 flex flex-col gap-6 pb-2">
+            <div class="flex-1 overflow-y-auto custom-scrollbar pr-4 mt-6 flex flex-col gap-6 pb-2 relative">
+              <div v-if="isDetailLoading" class="absolute inset-0 z-20 rounded-2xl bg-black/25 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
+                <div class="flex items-center gap-2 text-sm text-gray-200 bg-black/40 px-4 py-2 rounded-full border border-white/10">
+                  <Loader2 class="w-4 h-4 animate-spin" />
+                  加载详情中
+                </div>
+              </div>
               
               <div v-if="selectedRecord.ai_report" class="p-8 rounded-[2rem] bg-gradient-to-br from-ai-start/20 to-ai-end/20 border border-ai-start/30 relative overflow-hidden shadow-lg shrink-0">
                 <div class="absolute -top-4 -right-4 p-4 opacity-10 pointer-events-none">
@@ -186,54 +287,13 @@
                 
                 <div class="w-full h-[280px] bg-black/20 rounded-xl relative border border-white/5 overflow-hidden">
                   <div ref="chartRef" class="absolute inset-0"></div>
-                  <div v-if="!selectedRecord.sensor_data_series || selectedRecord.sensor_data_series.length === 0" class="absolute inset-0 flex flex-col items-center justify-center bg-black/50 backdrop-blur-sm z-10">
+                  <div v-if="!selectedRecord.sensor_data_series || selectedRecord.sensor_data_series.length === 0" class="absolute inset-0 flex flex-col items-center justify-center bg-black/35 z-10 pointer-events-none">
                     <ActivityIcon class="w-10 h-10 text-gray-600 mb-2 opacity-50" stroke-width="1.5" />
                     <p class="text-sm text-gray-500">本次训练未采集到体征序列数据</p>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-
-        <div class="shrink-0 pt-6 border-t border-white/10 mt-2 bg-transparent z-20">
-          <div class="flex items-center gap-2 mb-3 px-2">
-            <MessageSquare class="w-4 h-4 text-ai-start" />
-            <span class="text-sm font-bold text-gray-400 tracking-widest">向 AI 教练提问</span>
-          </div>
-
-          <div class="flex gap-4 mb-4 overflow-x-auto pb-2 custom-scrollbar">
-            <button 
-              v-for="(chip, idx) in quickQuestions" :key="idx"
-              @click="sendAiMessage(chip)"
-              class="whitespace-nowrap px-5 py-2.5 rounded-full bg-white/5 border border-white/10 text-sm font-medium text-gray-300 hover:bg-white/10 hover:text-white active:scale-95 transition-all shadow-sm flex items-center gap-2"
-            >
-              <Zap class="w-3.5 h-3.5 text-neon-green" />
-              {{ chip }}
-            </button>
-          </div>
-          
-          <div class="relative flex items-center">
-            <div class="absolute left-6 w-10 h-10 rounded-full bg-gradient-to-tr from-ai-start to-ai-end flex items-center justify-center shadow-lg pointer-events-none">
-              <Mic class="w-5 h-5 text-white" />
-            </div>
-            <input 
-              v-model="chatInput"
-              @keyup.enter="sendAiMessage(chatInput)"
-              type="text" 
-              placeholder="例如：“总结我近期的训练表现” 或 “我的心率恢复正常吗？”"
-              class="w-full h-16 bg-black/50 border border-white/10 rounded-full pl-20 pr-20 text-lg text-white outline-none focus:border-neon-green/50 transition-all shadow-inner placeholder-gray-500"
-              :disabled="isChatting"
-            >
-            <button 
-              @click="sendAiMessage(chatInput)"
-              :disabled="!chatInput || isChatting"
-              class="absolute right-3 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 shadow-md"
-              :class="chatInput && !isChatting ? 'bg-neon-green text-black hover:scale-105 hover:shadow-[0_0_15px_#32FF7E]' : 'bg-white/10 text-gray-500'"
-            >
-              <Loader2 v-if="isChatting" class="w-5 h-5 animate-spin" />
-              <Send v-else class="w-5 h-5 ml-1" />
-            </button>
           </div>
         </div>
 
@@ -244,7 +304,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch, inject } from 'vue'
-import { List, CalendarDays, MousePointerClick, Activity as ActivityIcon, Sparkles, Mic, Send, Loader2, HeartPulse, History, MessageSquare, Zap } from '@lucide/vue'
+import { List, CalendarDays, MousePointerClick, Activity as ActivityIcon, Sparkles, Mic, Send, Loader2, HeartPulse, History, MessageSquare, ChevronLeft, ChevronRight } from '@lucide/vue'
 import * as echarts from 'echarts' // 引入 ECharts
 import { fetchUserActivities, fetchUserActivityDetail } from '../api/user'
 import { askAi } from '../api/chat'
@@ -256,6 +316,9 @@ const isLoading = ref(false)
 const activities = ref([])
 const selectedRecordId = ref(null)
 const selectedRecord = ref(null)
+const selectedCalendarDate = ref('')
+const calendarCursor = ref('')
+const isDetailLoading = ref(false)
 
 const chatInput = ref('')
 const isChatting = ref(false)
@@ -288,27 +351,156 @@ const getActivityName = (record) => {
   return activityNameFallback[code] || code || '-'
 }
 
-const calendarDays = computed(() => {
-  const days = []
-  for (let i = 1; i <= 30; i++) {
-    const matchedRecord = activities.value.find(act => {
-      if(!act.start_time) return false;
-      const actDate = parseInt(act.start_time.substring(8, 10), 10)
-      return actDate === i
-    })
-    days.push({
-      date: i,
-      record: matchedRecord || null
+const parseRecordDate = (startTime) => {
+  const raw = String(startTime || '').trim().replace(' ', 'T')
+  const dt = new Date(raw)
+  if (Number.isNaN(dt.getTime())) return null
+  return dt
+}
+
+const toDateKey = (dt) => {
+  if (!dt) return ''
+  const y = dt.getFullYear()
+  const m = String(dt.getMonth() + 1).padStart(2, '0')
+  const d = String(dt.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+const toMonthKey = (dt) => {
+  if (!dt) return ''
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`
+}
+
+const parseMonthKey = (monthKey) => {
+  const text = String(monthKey || '')
+  const m = text.match(/^(\d{4})-(\d{2})$/)
+  if (!m) return null
+  return new Date(Number(m[1]), Number(m[2]) - 1, 1)
+}
+
+const activitiesByDate = computed(() => {
+  const map = {}
+  for (const act of activities.value) {
+    const dt = parseRecordDate(act.start_time)
+    if (!dt) continue
+    const key = toDateKey(dt)
+    if (!map[key]) map[key] = []
+    map[key].push(act)
+  }
+  Object.values(map).forEach((list) => {
+    list.sort((a, b) => String(b.start_time || '').localeCompare(String(a.start_time || '')))
+  })
+  return map
+})
+
+const calendarBaseDate = computed(() => {
+  if (calendarCursor.value) {
+    const fromCursor = parseMonthKey(calendarCursor.value)
+    if (fromCursor) return fromCursor
+  }
+  if (selectedCalendarDate.value) {
+    const dt = parseRecordDate(`${selectedCalendarDate.value} 00:00:00`)
+    if (dt) return dt
+  }
+  const firstRecord = activities.value[0]
+  const dt = parseRecordDate(firstRecord?.start_time)
+  return dt || new Date()
+})
+
+const calendarMonthLabel = computed(() => {
+  const base = calendarBaseDate.value
+  const year = base.getFullYear()
+  const month = base.getMonth() + 1
+  return `${year}年${month}月`
+})
+
+const calendarGrid = computed(() => {
+  const base = calendarBaseDate.value
+  const year = base.getFullYear()
+  const month = base.getMonth()
+
+  const firstDay = new Date(year, month, 1)
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const firstWeekday = (firstDay.getDay() + 6) % 7 // 周一=0
+
+  const cells = []
+  for (let i = 0; i < firstWeekday; i++) {
+    cells.push({ key: `blank-${i}`, dateKey: '', dayNumber: '', count: 0 })
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dt = new Date(year, month, day)
+    const dateKey = toDateKey(dt)
+    const count = (activitiesByDate.value[dateKey] || []).length
+    cells.push({
+      key: dateKey,
+      dateKey,
+      dayNumber: day,
+      count
     })
   }
-  return days
+
+  while (cells.length % 7 !== 0) {
+    const idx = cells.length
+    cells.push({ key: `blank-tail-${idx}`, dateKey: '', dayNumber: '', count: 0 })
+  }
+
+  return cells
 })
+
+const selectedDateRecords = computed(() => {
+  if (!selectedCalendarDate.value) return []
+  return activitiesByDate.value[selectedCalendarDate.value] || []
+})
+
+const selectedCalendarDateLabel = computed(() => {
+  if (!selectedCalendarDate.value) return '未选择日期'
+  return selectedCalendarDate.value
+})
+
+const formatRecordTime = (startTime) => {
+  const dt = parseRecordDate(startTime)
+  if (!dt) return '--:--'
+  return `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`
+}
+
+const formatRecordDuration = (record) => {
+  const sec = Number(record?.duration_seconds ?? record?.duration ?? 0)
+  if (!Number.isFinite(sec) || sec <= 0) return '0分'
+  const min = Math.floor(sec / 60)
+  const rem = sec % 60
+  if (min <= 0) return `${rem}秒`
+  return rem > 0 ? `${min}分${rem}秒` : `${min}分`
+}
+
+const handleCalendarDayClick = (cell) => {
+  const key = String(cell?.dateKey || '')
+  if (!key) return
+  selectedCalendarDate.value = key
+  const picked = parseRecordDate(`${key} 00:00:00`)
+  calendarCursor.value = toMonthKey(picked)
+  const records = activitiesByDate.value[key] || []
+  if (records.length > 0) {
+    selectRecord(records[0].id)
+  }
+}
+
+const changeCalendarMonth = (delta) => {
+  const base = calendarBaseDate.value
+  const moved = new Date(base.getFullYear(), base.getMonth() + delta, 1)
+  calendarCursor.value = toMonthKey(moved)
+}
 
 const fetchActivities = async () => {
   isLoading.value = true
   try {
     const data = await fetchUserActivities()
     activities.value = data.records || []
+    if (!selectedCalendarDate.value && activities.value.length > 0) {
+      const firstDate = parseRecordDate(activities.value[0].start_time)
+      selectedCalendarDate.value = toDateKey(firstDate)
+      calendarCursor.value = toMonthKey(firstDate)
+    }
     if (!selectedRecordId.value && activities.value.length > 0) {
       selectRecord(activities.value[0].id)
     }
@@ -322,6 +514,7 @@ const fetchActivities = async () => {
 // ================= ECharts 相关逻辑 =================
 const chartRef = ref(null)
 let chartInstance = null
+let selectRecordReqSeq = 0
 
 // 当选中的记录发生变化且包含体征数据时，渲染图表
 watch(selectedRecord, async (newVal) => {
@@ -446,11 +639,19 @@ const handleResize = () => {
 
 const selectRecord = async (id) => {
   if(!id) return
+  const reqSeq = ++selectRecordReqSeq
   selectedRecordId.value = id
+  isDetailLoading.value = true
   try {
-    selectedRecord.value = await fetchUserActivityDetail(id)
+    const detail = await fetchUserActivityDetail(id)
+    if (reqSeq !== selectRecordReqSeq) return
+    selectedRecord.value = detail
   } catch (err) {
     console.error('获取详情失败', err)
+  } finally {
+    if (reqSeq === selectRecordReqSeq) {
+      isDetailLoading.value = false
+    }
   }
 }
 
@@ -472,6 +673,14 @@ const sendAiMessage = async (message) => {
     isChatting.value = false
   }
 }
+
+watch(viewMode, (mode) => {
+  if (mode !== 'calendar') return
+  if (!selectedCalendarDate.value && activities.value.length > 0) {
+    const firstDate = parseRecordDate(activities.value[0].start_time)
+    selectedCalendarDate.value = toDateKey(firstDate)
+  }
+})
 
 onMounted(() => {
   fetchActivities()
