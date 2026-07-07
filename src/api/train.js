@@ -7,6 +7,12 @@ export const playTts = (payload) => {
   })
 }
 
+export const stopTts = () => {
+  return request('/api/train/tts-stop/', {
+    method: 'POST'
+  })
+}
+
 export const fetchExercises = () => {
   return request('/api/train/exercises/', { auth: true })
 }

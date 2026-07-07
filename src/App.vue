@@ -72,6 +72,7 @@
         :speechText="voiceDisplayText"
         :isVisible="voiceBubbleVisible"
         :isExpanded="voiceBubbleExpanded"
+        :lingerActive="voiceLingerActive"
         @toggleExpand="toggleVoiceBubbleExpand"
       />
     </template>
@@ -84,7 +85,7 @@ import { computed, ref, provide, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Home, Activity, User, LogOut } from '@lucide/vue'
 import AIVoiceAssistant from './components/AIVoiceAssistant.vue'
-import { playTts } from './api/train'
+import { playTts, stopTts } from './api/train'
 
 const route = useRoute()
 const router = useRouter()
@@ -113,6 +114,8 @@ let voiceTimer = null
 const voiceDisplayText = ref('')
 const voiceFullText = ref('')
 let voiceStreamTimer = null
+const voiceLingerActive = ref(false)
+let voiceLingerTimer = null
 const voiceBubbleVisible = ref(true)
 const voiceBubbleExpanded = ref(false)
 const voiceRequestToken = ref(0)
@@ -172,6 +175,14 @@ const clearVoiceStream = () => {
   }
 }
 
+const clearVoiceLinger = () => {
+  voiceLingerActive.value = false
+  if (voiceLingerTimer) {
+    clearTimeout(voiceLingerTimer)
+    voiceLingerTimer = null
+  }
+}
+
 // durationSec：允许传入精确的秒数
 const playVoice = (text, durationSec = null) => {
   isVoicePlaying.value = true
@@ -180,6 +191,7 @@ const playVoice = (text, durationSec = null) => {
   voiceDisplayText.value = ''
   voiceBubbleVisible.value = true
   voiceBubbleExpanded.value = false
+  clearVoiceLinger()
 
   clearVoiceStream()
   let index = 0
@@ -207,6 +219,15 @@ const playVoice = (text, durationSec = null) => {
     voiceBubbleVisible.value = true
     voiceDisplayText.value = safeText
     clearVoiceStream()
+    voiceLingerActive.value = true
+    if (voiceLingerTimer) {
+      clearTimeout(voiceLingerTimer)
+      voiceLingerTimer = null
+    }
+    voiceLingerTimer = setTimeout(() => {
+      voiceLingerActive.value = false
+      voiceLingerTimer = null
+    }, 3500)
     voiceTimer = null
   }, timeoutMs) 
 }
@@ -242,12 +263,16 @@ const stopVoice = () => {
   voiceRequestToken.value += 1
   isVoicePlaying.value = false
   clearVoiceStream()
+  clearVoiceLinger()
   voiceDisplayText.value = voiceFullText.value || voiceDisplayText.value
   if (voiceTimer) {
     clearTimeout(voiceTimer)
     voiceTimer = null
   }
   voiceBubbleVisible.value = true
+
+  // 通知后端立即中断本地扬声器播放（最佳努力，不阻塞前端 UI）
+  stopTts().catch(() => {})
 }
 
 // 供全局注入
@@ -289,6 +314,7 @@ onBeforeUnmount(() => {
     voiceTimer = null
   }
   clearVoiceStream()
+  clearVoiceLinger()
 })
 </script>
 

@@ -23,7 +23,7 @@
             AI 教练
           </span>
           <span :class="['text-xs tracking-wider transition-all duration-300 mt-0.5', isPlaying ? 'text-neon-green font-medium' : 'text-white/50 uppercase']">
-            {{ collapsedMode ? '点击展开上次回复' : (isPlaying ? '说话中...' : '已播报，点击查看完整内容') }}
+            {{ collapsedMode ? (lingerActive ? '刚播报完成' : '点击展开上次回复') : (isPlaying ? '说话中...' : '已播报，点击查看完整内容') }}
           </span>
           <span v-if="speechText && !collapsedMode" class="text-xs mt-1 text-white/75 whitespace-pre-wrap break-words transition-all duration-500" :class="(isExpanded || isPlaying) ? 'max-h-[240px] overflow-y-auto pr-1 opacity-100' : 'line-clamp-4 opacity-90'">
             {{ speechText }}
@@ -64,6 +64,10 @@ const props = defineProps({
   speechText: {
     type: String,
     default: ''
+  },
+  lingerActive: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -76,6 +80,10 @@ const bubbleClass = computed(() => {
 
   if (props.isPlaying) {
     return 'bg-black/90 border-ai-start/60 w-[420px] max-w-[min(520px,88vw)] p-4 translate-x-2 scale-[1.02]'
+  }
+
+  if (props.lingerActive) {
+    return 'bg-black/75 border-ai-start/40 w-[360px] max-w-[min(500px,85vw)] p-3.5 translate-x-2'
   }
 
   return 'bg-white/8 border-white/15 w-[212px] p-3 hover:w-[236px] hover:border-white/25 hover:bg-white/10 hover:-translate-y-0.5'
