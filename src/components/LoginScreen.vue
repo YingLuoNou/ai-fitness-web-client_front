@@ -309,30 +309,57 @@ const logVideoInputDevices = (devices) => {
   console.log('[Camera] videoinput devices:', videoInputs)
 }
 
-const getPreferredVideoConstraints = async () => {
-  const base = { width: 640, height: 480, facingMode: 'user' }
+const enumerateVideoDevices = async (tag = 'default') => {
   if (!navigator.mediaDevices?.enumerateDevices) {
+    console.warn('[Camera] enumerateDevices unavailable')
+    return []
+  }
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices()
+    console.log(`[Camera] enumerate(${tag}) done`)
+    logVideoInputDevices(devices)
+    return devices
+  } catch (e) {
+    console.warn(`[Camera] enumerate(${tag}) failed`, e)
+    return []
+  }
+}
+
+const getVideoDevicesWithPermission = async () => {
+  let devices = await enumerateVideoDevices('before-permission')
+  const hasLabeled = devices.some((d) => d.kind === 'videoinput' && String(d.label || '').trim())
+  if (hasLabeled) return devices
+
+  try {
+    const probe = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+    probe.getTracks().forEach((track) => track.stop())
+  } catch (e) {
+    console.warn('[Camera] permission probe failed', e)
+  }
+
+  devices = await enumerateVideoDevices('after-permission')
+  return devices
+}
+
+const getPreferredVideoConstraints = async () => {
+  const base = { width: 640, height: 480 }
+  if (!navigator.mediaDevices) {
     return { preferred: null, fallback: base }
   }
 
-  try {
-    const devices = await navigator.mediaDevices.enumerateDevices()
-    logVideoInputDevices(devices)
-    const preferred = devices.find(
-      (d) => d.kind === 'videoinput' && matchesPreferredCameraLabel(d.label)
-    )
-    if (preferred?.deviceId) {
-      return {
-        preferred: {
-          width: 640,
-          height: 480,
-          deviceId: { exact: preferred.deviceId }
-        },
-        fallback: base
-      }
+  const devices = await getVideoDevicesWithPermission()
+  const preferred = devices.find(
+    (d) => d.kind === 'videoinput' && matchesPreferredCameraLabel(d.label)
+  )
+  if (preferred?.deviceId) {
+    return {
+      preferred: {
+        width: 640,
+        height: 480,
+        deviceId: { exact: preferred.deviceId }
+      },
+      fallback: base
     }
-  } catch (e) {
-    console.warn('枚举摄像头失败，回退默认摄像头', e)
   }
 
   return { preferred: null, fallback: base }
@@ -360,10 +387,6 @@ const openCameraWithFallback = async () => {
 
 const startCamera = async () => {
   try {
-    // 先申请权限，确保设备 label 可用
-    const bootstrap = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-    bootstrap.getTracks().forEach(track => track.stop())
-
     stream = await openCameraWithFallback()
     if (videoRef.value) {
       videoRef.value.srcObject = stream
