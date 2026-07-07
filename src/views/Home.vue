@@ -292,7 +292,7 @@ const triggerWelcomeVoice = async (username, planStatus) => {
   
   try {
     if (speakWithBackendTts) {
-      await speakWithBackendTts(textToSpeak, 'zh-CN-YunxiNeural')
+      await speakWithBackendTts(textToSpeak)
     }
   } catch (err) {
     console.error('触发入场语音失败:', err)

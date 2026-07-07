@@ -232,7 +232,7 @@ const playVoice = (text, durationSec = null) => {
   }, timeoutMs) 
 }
 
-const speakWithBackendTts = async (text, voice = 'zh-CN-YunxiNeural') => {
+const speakWithBackendTts = async (text, voice = '') => {
   const normalizedText = String(text || '').trim()
   if (!normalizedText) return { duration: 0 }
 
@@ -242,7 +242,11 @@ const speakWithBackendTts = async (text, voice = 'zh-CN-YunxiNeural') => {
   playVoice(normalizedText)
 
   try {
-    const data = await playTts({ text: normalizedText, voice })
+    const payload = { text: normalizedText }
+    if (voice) {
+      payload.voice = voice
+    }
+    const data = await playTts(payload)
     if (token !== voiceRequestToken.value) return data
 
     const durationSec = Number(data?.duration)
