@@ -290,29 +290,59 @@ const scanStatus = reactive({
   color: 'text-white'
 })
 
+const matchesPreferredCameraLabel = (label) => {
+  const text = String(label || '').toLowerCase()
+  if (!text) return false
+  if (text.includes(PREFERRED_CAMERA_NAME.toLowerCase())) return true
+  return /global\s*shutter/.test(text) && /camera/.test(text)
+}
+
 const getPreferredVideoConstraints = async () => {
   const base = { width: 640, height: 480, facingMode: 'user' }
   if (!navigator.mediaDevices?.enumerateDevices) {
-    return base
+    return { preferred: null, fallback: base }
   }
 
   try {
     const devices = await navigator.mediaDevices.enumerateDevices()
     const preferred = devices.find(
-      (d) => d.kind === 'videoinput' && String(d.label || '').includes(PREFERRED_CAMERA_NAME)
+      (d) => d.kind === 'videoinput' && matchesPreferredCameraLabel(d.label)
     )
     if (preferred?.deviceId) {
       return {
-        width: 640,
-        height: 480,
-        deviceId: { exact: preferred.deviceId }
+        preferred: {
+          width: 640,
+          height: 480,
+          deviceId: { exact: preferred.deviceId }
+        },
+        fallback: base
       }
     }
   } catch (e) {
     console.warn('枚举摄像头失败，回退默认摄像头', e)
   }
 
-  return base
+  return { preferred: null, fallback: base }
+}
+
+const openCameraWithFallback = async () => {
+  const { preferred, fallback } = await getPreferredVideoConstraints()
+
+  if (preferred) {
+    try {
+      return await navigator.mediaDevices.getUserMedia({
+        video: preferred,
+        audio: false
+      })
+    } catch (e) {
+      console.warn('指定 Global Shutter Camera 失败，回退默认摄像头', e)
+    }
+  }
+
+  return await navigator.mediaDevices.getUserMedia({
+    video: fallback,
+    audio: false
+  })
 }
 
 const startCamera = async () => {
@@ -321,11 +351,7 @@ const startCamera = async () => {
     const bootstrap = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
     bootstrap.getTracks().forEach(track => track.stop())
 
-    const constraints = await getPreferredVideoConstraints()
-    stream = await navigator.mediaDevices.getUserMedia({ 
-      video: constraints,
-      audio: false
-    })
+    stream = await openCameraWithFallback()
     if (videoRef.value) {
       videoRef.value.srcObject = stream
       videoRef.value.onloadedmetadata = () => {
