@@ -297,6 +297,18 @@ const matchesPreferredCameraLabel = (label) => {
   return /global\s*shutter/.test(text) && /camera/.test(text)
 }
 
+const logVideoInputDevices = (devices) => {
+  const videoInputs = (devices || [])
+    .filter((d) => d.kind === 'videoinput')
+    .map((d, index) => ({
+      index,
+      label: d.label || '(empty label)',
+      deviceId: d.deviceId,
+      groupId: d.groupId
+    }))
+  console.log('[Camera] videoinput devices:', videoInputs)
+}
+
 const getPreferredVideoConstraints = async () => {
   const base = { width: 640, height: 480, facingMode: 'user' }
   if (!navigator.mediaDevices?.enumerateDevices) {
@@ -305,6 +317,7 @@ const getPreferredVideoConstraints = async () => {
 
   try {
     const devices = await navigator.mediaDevices.enumerateDevices()
+    logVideoInputDevices(devices)
     const preferred = devices.find(
       (d) => d.kind === 'videoinput' && matchesPreferredCameraLabel(d.label)
     )
