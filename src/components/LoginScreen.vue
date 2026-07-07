@@ -282,6 +282,7 @@ const videoRef = ref(null)
 const canvasRef = ref(null)
 let stream = null
 let scanInterval = null
+const PREFERRED_CAMERA_NAME = 'Global Shutter Camera'
 
 const scanStatus = reactive({
   title: '靠近即可唤醒',
@@ -289,10 +290,41 @@ const scanStatus = reactive({
   color: 'text-white'
 })
 
+const getPreferredVideoConstraints = async () => {
+  const base = { width: 640, height: 480, facingMode: 'user' }
+  if (!navigator.mediaDevices?.enumerateDevices) {
+    return base
+  }
+
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices()
+    const preferred = devices.find(
+      (d) => d.kind === 'videoinput' && String(d.label || '').includes(PREFERRED_CAMERA_NAME)
+    )
+    if (preferred?.deviceId) {
+      return {
+        width: 640,
+        height: 480,
+        deviceId: { exact: preferred.deviceId }
+      }
+    }
+  } catch (e) {
+    console.warn('枚举摄像头失败，回退默认摄像头', e)
+  }
+
+  return base
+}
+
 const startCamera = async () => {
   try {
+    // 先申请权限，确保设备 label 可用
+    const bootstrap = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+    bootstrap.getTracks().forEach(track => track.stop())
+
+    const constraints = await getPreferredVideoConstraints()
     stream = await navigator.mediaDevices.getUserMedia({ 
-      video: { width: 640, height: 480, facingMode: 'user' } 
+      video: constraints,
+      audio: false
     })
     if (videoRef.value) {
       videoRef.value.srcObject = stream

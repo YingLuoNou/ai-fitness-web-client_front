@@ -264,6 +264,7 @@ const avatarPreviewFailed = ref(false)
 
 let activeMedia = null
 let activeTrack = null
+const PREFERRED_CAMERA_NAME = 'Global Shutter Camera'
 
 const statusMessage = reactive({
   type: 'ok',
@@ -518,6 +519,31 @@ watch(() => settingsForm.avatar, () => {
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
+const getPreferredVideoConstraints = async () => {
+  const base = { width: 640, height: 480, facingMode: 'user' }
+  if (!navigator.mediaDevices?.enumerateDevices) {
+    return base
+  }
+
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices()
+    const preferred = devices.find(
+      (d) => d.kind === 'videoinput' && String(d.label || '').includes(PREFERRED_CAMERA_NAME)
+    )
+    if (preferred?.deviceId) {
+      return {
+        width: 640,
+        height: 480,
+        deviceId: { exact: preferred.deviceId }
+      }
+    }
+  } catch (e) {
+    console.warn('枚举摄像头失败，回退默认摄像头', e)
+  }
+
+  return base
+}
+
 const cleanupFaceMedia = () => {
   if (activeTrack) activeTrack.stop()
   if (activeMedia) activeMedia.getTracks().forEach((item) => item.stop())
@@ -581,8 +607,14 @@ const toggleFaceEnroll = async () => {
     statusMessage.type = 'ok'
     statusMessage.text = '连续采集中，请正对摄像头...'
 
+    // 先申请权限，确保设备 label 可用
+    const bootstrap = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+    bootstrap.getTracks().forEach((t) => t.stop())
+
+    const constraints = await getPreferredVideoConstraints()
+
     activeMedia = await navigator.mediaDevices.getUserMedia({
-      video: { width: 640, height: 480, facingMode: 'user' },
+      video: constraints,
       audio: false
     })
 
