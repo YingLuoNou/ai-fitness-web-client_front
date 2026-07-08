@@ -119,10 +119,13 @@ let voiceLingerTimer = null
 const voiceBubbleVisible = ref(true)
 const voiceBubbleExpanded = ref(false)
 const voiceRequestToken = ref(0)
+const activeVoiceSessionId = ref(0)
 
 const switchAccount = () => {
   localStorage.removeItem('auth_token')
   sessionStorage.removeItem('welcome_voice_pending')
+  sessionStorage.removeItem('login_context')
+  sessionStorage.removeItem('plan_ready_toast')
   router.push('/')
 }
 
@@ -183,8 +186,27 @@ const clearVoiceLinger = () => {
   }
 }
 
+const finalizeVoiceVisual = (sessionId) => {
+  if (sessionId !== activeVoiceSessionId.value) return
+  isVoicePlaying.value = false
+  voiceBubbleVisible.value = true
+  voiceDisplayText.value = voiceFullText.value || voiceDisplayText.value
+  clearVoiceStream()
+  voiceLingerActive.value = true
+  if (voiceLingerTimer) {
+    clearTimeout(voiceLingerTimer)
+    voiceLingerTimer = null
+  }
+  voiceLingerTimer = setTimeout(() => {
+    if (sessionId !== activeVoiceSessionId.value) return
+    voiceLingerActive.value = false
+    voiceLingerTimer = null
+  }, 3500)
+}
+
 // durationSec：允许传入精确的秒数
-const playVoice = (text, durationSec = null) => {
+const playVoice = (text, durationSec = null, sessionId = Date.now()) => {
+  activeVoiceSessionId.value = sessionId
   isVoicePlaying.value = true
   const safeText = String(text || '')
   voiceFullText.value = safeText
@@ -215,19 +237,7 @@ const playVoice = (text, durationSec = null) => {
   const timeoutMs = durationSec !== null ? (durationSec * 1000) : (estimatedSec * 1000)
 
   voiceTimer = setTimeout(() => { 
-    isVoicePlaying.value = false
-    voiceBubbleVisible.value = true
-    voiceDisplayText.value = safeText
-    clearVoiceStream()
-    voiceLingerActive.value = true
-    if (voiceLingerTimer) {
-      clearTimeout(voiceLingerTimer)
-      voiceLingerTimer = null
-    }
-    voiceLingerTimer = setTimeout(() => {
-      voiceLingerActive.value = false
-      voiceLingerTimer = null
-    }, 3500)
+    finalizeVoiceVisual(sessionId)
     voiceTimer = null
   }, timeoutMs) 
 }
@@ -238,8 +248,7 @@ const speakWithBackendTts = async (text, voice = '') => {
 
   const token = voiceRequestToken.value + 1
   voiceRequestToken.value = token
-
-  playVoice(normalizedText)
+  const sessionId = Date.now() + token
 
   try {
     const payload = { text: normalizedText }
@@ -248,10 +257,14 @@ const speakWithBackendTts = async (text, voice = '') => {
     }
     const data = await playTts(payload)
     if (token !== voiceRequestToken.value) return data
+    playVoice(normalizedText, null, sessionId)
 
     const durationSec = Number(data?.duration)
     if (Number.isFinite(durationSec) && durationSec > 0) {
-      playVoice(normalizedText, durationSec)
+      playVoice(normalizedText, durationSec, sessionId)
+    } else {
+      const estimatedSec = Math.max(2, Math.ceil(normalizedText.length / 4))
+      playVoice(normalizedText, estimatedSec, sessionId)
     }
     return data
   } catch (error) {
@@ -265,6 +278,7 @@ const speakWithBackendTts = async (text, voice = '') => {
 // 新增：强制提前停止动效的方法
 const stopVoice = () => {
   voiceRequestToken.value += 1
+  activeVoiceSessionId.value += 1
   isVoicePlaying.value = false
   clearVoiceStream()
   clearVoiceLinger()

@@ -4,7 +4,7 @@
     <header class="flex justify-between items-center mb-8 shrink-0 pl-2">
       <div>
         <h2 class="text-4xl font-bold tracking-tight">运动记录</h2>
-        <p class="text-lg text-gray-400 mt-2">回顾训练历程，随时与 AI 教练对话分析</p>
+        <p class="text-lg text-gray-400 mt-2">回顾训练历程，随时查看分析与建议</p>
       </div>
       
       <div class="flex bg-black/30 p-1.5 rounded-2xl border border-white/10 shadow-inner backdrop-blur-md">
@@ -167,7 +167,7 @@
           <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-2 px-1">
               <MessageSquare class="w-4 h-4 text-ai-start" />
-              <span class="text-sm font-bold text-white tracking-widest">向 AI 教练提问</span>
+              <span class="text-sm font-bold text-white tracking-widest">向智能教练提问</span>
             </div>
             <button
               @click="openAiChatDialog()"
@@ -187,7 +187,7 @@
           <div v-if="!selectedRecord" class="flex-1 flex flex-col items-center justify-center text-gray-400 opacity-60">
             <MousePointerClick class="w-20 h-20 mb-8 text-white/20" stroke-width="1" />
             <p class="text-3xl font-bold tracking-widest text-white">请选择一条记录</p>
-            <p class="text-xl mt-3">查看详细体征数据与 AI 深度复盘报告</p>
+            <p class="text-xl mt-3">查看详细体征数据与训练复盘报告</p>
           </div>
 
           <div v-else class="flex flex-col h-full overflow-hidden">
@@ -207,7 +207,7 @@
                   <p class="text-3xl font-mono text-white">{{ selectedRecord.perceived_exertion || '-' }}<span class="text-sm text-gray-500 ml-1">/10</span></p>
                 </div>
                 <div class="text-center bg-black/20 px-5 py-3 rounded-2xl border border-white/5 shadow-inner">
-                  <p class="text-gray-300 text-xs tracking-widest mb-1">AI 动作评分</p>
+                  <p class="text-gray-300 text-xs tracking-widest mb-1">动作评分</p>
                   <p class="text-3xl font-mono text-neon-green font-bold">{{ selectedRecord.quality_score || '-' }}<span class="text-sm text-gray-500 ml-1">分</span></p>
                 </div>
               </div>
@@ -226,7 +226,7 @@
                   <Sparkles class="w-48 h-48" />
                 </div>
                 <h4 class="text-xl font-bold text-white mb-4 flex items-center gap-3 relative z-10">
-                  <Sparkles class="w-5 h-5 text-neon-green" /> 训练深度评估
+                  <Sparkles class="w-5 h-5 text-neon-green" /> 训练评估
                 </h4>
                 <p class="text-gray-200 leading-relaxed text-lg relative z-10 tracking-wide">
                   {{ selectedRecord.ai_report.feedback }}
@@ -284,7 +284,7 @@
       <div class="w-[980px] max-w-[92vw] h-[76vh] rounded-[2rem] border border-white/15 bg-[#101318]/95 shadow-[0_30px_80px_rgba(0,0,0,.6)] p-6 flex flex-col">
         <div class="flex items-center justify-between mb-4">
           <div>
-            <h3 class="text-2xl font-bold">AI 教练对话</h3>
+            <h3 class="text-2xl font-bold">智能教练对话</h3>
             <p class="text-xs text-gray-400 mt-1">会话仅保存在内存，不落库</p>
           </div>
           <button @click="closeAiChatDialog" class="w-10 h-10 rounded-full border border-white/15 bg-white/5 hover:bg-white/10 transition-all">✕</button>
@@ -311,7 +311,7 @@
             :class="msg.role === 'user' ? 'ml-20 bg-white/5 border-white/10' : 'mr-20 bg-neon-green/10 border-neon-green/30'"
           >
             <p class="text-[11px] uppercase tracking-wider mb-1" :class="msg.role === 'user' ? 'text-gray-400' : 'text-neon-green'">
-              {{ msg.role === 'user' ? '你' : 'AI 教练' }}
+              {{ msg.role === 'user' ? '你' : '智能教练' }}
             </p>
             <p v-if="msg.role === 'user'" class="text-sm leading-6 whitespace-pre-wrap break-words">{{ msg.content }}</p>
             <div

@@ -3,13 +3,23 @@
     
     <header class="flex justify-between items-end mb-10">
       <div>
-        <h2 class="text-5xl font-bold tracking-tight mb-2">晚上好, <span class="text-neon-green">{{ dashboardData.user_info.username }}</span></h2>
-        <p class="text-xl text-gray-400 font-medium">今天有一组训练计划等待完成，准备好流汗了吗？</p>
+        <h2 class="text-5xl font-bold tracking-tight mb-2">{{ greetingText }}, <span class="text-neon-green">{{ dashboardData.user_info.username }}</span></h2>
+        <p class="text-xl text-gray-400 font-medium">{{ headerSubtitle }}</p>
       </div>
       <div class="text-right">
         <p class="text-4xl font-mono text-white tracking-widest">{{ currentTime }}</p>
       </div>
     </header>
+
+    <div v-if="planReadyToastVisible" class="mb-4 px-7 py-4 rounded-2xl border border-neon-green/30 bg-neon-green/12 text-neon-green shadow-[0_0_24px_rgba(50,255,126,0.18)] animate-fade-in-up">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">✅</span>
+        <div>
+          <p class="text-xl font-bold">你的训练计划已生成完成</p>
+          <p class="text-sm text-neon-green/80 mt-1">可以直接开始今天的训练，或先查看完整安排。</p>
+        </div>
+      </div>
+    </div>
 
     <div v-if="statusMessage.text" class="mb-4 px-6 py-3 rounded-lg" :class="statusMessage.type === 'error' ? 'bg-neon-red/10 text-neon-red' : (statusMessage.type === 'warning' ? 'bg-neon-orange/10 text-neon-orange' : 'bg-neon-green/10 text-neon-green')">
       {{ statusMessage.text }}
@@ -127,6 +137,8 @@ const speakWithBackendTts = inject('speakWithBackendTts')
 
 const router = useRouter()
 const WELCOME_VOICE_PENDING_KEY = 'welcome_voice_pending'
+const PLAN_READY_TOAST_KEY = 'plan_ready_toast'
+let planReadyToastTimer = null
 
 // --- 时钟逻辑 ---
 const currentTime = ref('')
@@ -151,6 +163,50 @@ const dashboardData = reactive({
 
 const isStartingPlan = ref(false)
 const statusMessage = reactive({ type: 'ok', text: '' })
+const planReadyToastVisible = ref(false)
+
+const getGreetingByTime = () => {
+  const hour = new Date().getHours()
+  if (hour >= 5 && hour < 8) return '早上好'
+  if (hour >= 8 && hour < 12) return '上午好'
+  if (hour >= 12 && hour < 14) return '中午好'
+  if (hour >= 14 && hour < 18) return '下午好'
+  if (hour >= 18 && hour < 23) return '晚上好'
+  return '夜深了'
+}
+
+const greetingText = computed(() => getGreetingByTime())
+
+const loginContext = computed(() => {
+  try {
+    const raw = sessionStorage.getItem('login_context')
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+})
+
+const headerSubtitle = computed(() => {
+  if (loginContext.value?.isFirstLogin) {
+    return '欢迎加入，专属训练计划已为你准备中。'
+  }
+  if (dashboardData.plan_status.today_exercises.length === 0) {
+    return '今天安排以恢复放松为主，记得给身体一点缓冲时间。'
+  }
+  if (dashboardData.plan_status.is_completed) {
+    return '今天的训练已经完成，继续保持这个节奏。'
+  }
+  return '今天有一组训练计划等待完成，准备好开始了吗？'
+})
+
+const showPlanReadyToast = () => {
+  planReadyToastVisible.value = true
+  if (planReadyToastTimer) clearTimeout(planReadyToastTimer)
+  planReadyToastTimer = setTimeout(() => {
+    planReadyToastVisible.value = false
+    planReadyToastTimer = null
+  }, 4500)
+}
 
 // --- 动态计算 BMI ---
 const bmiValue = computed(() => {
@@ -219,6 +275,11 @@ const fetchDashboardData = async () => {
       await triggerWelcomeVoice(username, data.plan_status)
       sessionStorage.removeItem(WELCOME_VOICE_PENDING_KEY)
     }
+
+    if (sessionStorage.getItem(PLAN_READY_TOAST_KEY) === '1') {
+      showPlanReadyToast()
+      sessionStorage.removeItem(PLAN_READY_TOAST_KEY)
+    }
   } catch (err) {
     console.error('主页拉取数据失败:', err)
     if (err.status === 401) {
@@ -253,7 +314,7 @@ const startTodayPlan = async () => {
     const sessionId = data.session_id || data.id || ''
     if (sessionId) {
       statusMessage.type = 'ok'
-      statusMessage.text = '训练会话已创建，跳转中...'
+      statusMessage.text = '训练已准备完成，正在进入...'
       router.push({
         path: '/training-session',
         query: {
@@ -267,7 +328,7 @@ const startTodayPlan = async () => {
       })
     } else {
       statusMessage.type = 'warning'
-      statusMessage.text = '会话创建失败，使用本地训练页'
+      statusMessage.text = '未能同步训练记录，已为你切换到训练页'
       router.push('/training-session')
     }
   } catch (err) {
@@ -283,11 +344,13 @@ const startTodayPlan = async () => {
 const triggerWelcomeVoice = async (username, planStatus) => {
   let textToSpeak = ''
   if (planStatus.today_exercises.length === 0) {
-    textToSpeak = `欢迎回来，${username}。今天是休息日，好好放松一下肌肉吧。`
+    textToSpeak = `${loginContext.value?.isFirstLogin ? '欢迎加入' : getGreetingByTime()}，${username}。今天是恢复日，记得舒展身体，保持轻松节奏。`
   } else if (planStatus.is_completed) {
     textToSpeak = `干得漂亮，${username}！你已经完成了今天所有的训练任务，真是自律的一天。`
   } else {
-    textToSpeak = `欢迎回来，${username}。今天还有 ${100 - planStatus.progress_percent}% 的进度未完成，请点击启动今日计划。`
+    textToSpeak = loginContext.value?.isFirstLogin
+      ? `欢迎加入，${username}。你的专属训练计划已经准备好了，随时可以开始今天的第一组训练。`
+      : `${getGreetingByTime()}，${username}。今天还有 ${100 - planStatus.progress_percent}% 的进度待完成，准备好就开始吧。`
   }
   
   try {
@@ -308,5 +371,23 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   if (timeInterval) clearInterval(timeInterval)
+  if (planReadyToastTimer) clearTimeout(planReadyToastTimer)
 })
 </script>
+
+<style scoped>
+.animate-fade-in-up {
+  animation: fade-in-up .35s ease-out;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style>

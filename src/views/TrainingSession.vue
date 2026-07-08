@@ -9,10 +9,10 @@
       alt="pose stream"
     />
     <div v-else class="absolute inset-0 w-full h-full flex items-center justify-center text-gray-300">
-      /pose/image 视频流未配置
+      视频画面暂未就绪
     </div>
     <div v-if="poseStreamError" class="absolute inset-0 w-full h-full flex items-center justify-center text-red-300 bg-black/30 z-10 pointer-events-none">
-      ROS 图像流断开，请检查 /pose/image 与 mjpeg 服务
+      画面连接中断，请稍后重试或联系工作人员
     </div>
 
     <div class="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/40"></div>
@@ -21,12 +21,13 @@
       v-if="currentPhase === 'REST'"
       class="absolute inset-0 z-20 flex items-center justify-center bg-black/55 backdrop-blur-sm pointer-events-none"
     >
-      <div class="text-center px-8 py-6 rounded-3xl border border-cyan-200/40 bg-black/45 shadow-2xl">
-        <p class="text-cyan-200 text-sm tracking-[0.2em]">REST</p>
-        <p class="mt-2 text-5xl font-black">休息中</p>
-        <p class="mt-4 text-2xl font-mono">剩余 {{ restRemainingSeconds }} 秒</p>
-        <p class="mt-2 text-base text-neon-orange" v-if="stableSampling.active && stableSampling.phase === 'REST'">
-          静止采样剩余 {{ restSamplingRemainingSeconds }} 秒
+      <div class="text-center px-12 py-10 rounded-3xl border border-cyan-200/40 bg-black/45 shadow-2xl max-w-[720px]">
+        <p class="text-cyan-200 text-lg tracking-[0.28em] font-semibold">REST</p>
+        <p class="mt-3 text-7xl font-black">休息调整中</p>
+        <p class="mt-5 text-4xl font-mono">剩余 {{ restRemainingSeconds }} 秒</p>
+        <p class="mt-4 text-2xl text-cyan-100">放松肩颈，均匀呼吸，为下一组做准备。</p>
+        <p class="mt-3 text-2xl text-neon-orange font-semibold" v-if="stableSampling.active && stableSampling.phase === 'REST'">
+          请保持自然站立，{{ restSamplingRemainingSeconds }} 秒后完成恢复检测
         </p>
       </div>
     </div>
@@ -35,11 +36,11 @@
       v-if="isEndSampling"
       class="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-none"
     >
-      <div class="text-center px-8 py-6 rounded-3xl border border-neon-orange/50 bg-black/50 shadow-2xl">
-        <p class="text-neon-orange text-sm tracking-[0.2em]">END</p>
-        <p class="mt-2 text-5xl font-black">结束采样中</p>
-        <p class="mt-4 text-2xl font-mono">剩余 {{ endSamplingRemainingSeconds }} 秒</p>
-        <p class="mt-2 text-base text-gray-200">请保持静止，正在采集结束体征</p>
+      <div class="text-center px-12 py-10 rounded-3xl border border-neon-orange/50 bg-black/50 shadow-2xl max-w-[760px]">
+        <p class="text-neon-orange text-lg tracking-[0.28em] font-semibold">END</p>
+        <p class="mt-3 text-7xl font-black">训练收尾中</p>
+        <p class="mt-5 text-4xl font-mono">剩余 {{ endSamplingRemainingSeconds }} 秒</p>
+        <p class="mt-4 text-2xl text-gray-100">请保持自然站立，系统正在记录训练后的身体状态。</p>
       </div>
     </div>
 
@@ -48,9 +49,9 @@
         <p class="text-sm text-gray-300 tracking-wider">实时体征</p>
         <p class="text-3xl font-mono font-bold mt-2 text-neon-red">{{ metrics.heartRate }} bpm</p>
         <p class="text-xl font-mono mt-1 text-neon-green">SpO₂ {{ metrics.spo2 }}%</p>
-        <p v-if="currentPhase === 'REST'" class="mt-2 text-sm text-cyan-200 font-semibold">休息倒计时：{{ restRemainingSeconds }}s</p>
-        <p v-if="currentPhase === 'REST' && stableSampling.active" class="mt-1 text-sm text-neon-orange font-semibold">静止采样倒计时：{{ restSamplingRemainingSeconds }}s</p>
-        <p v-if="isEndSampling" class="mt-1 text-sm text-neon-orange font-semibold">结束采样倒计时：{{ endSamplingRemainingSeconds }}s</p>
+        <p v-if="currentPhase === 'REST'" class="mt-3 text-lg text-cyan-200 font-semibold">休息倒计时：{{ restRemainingSeconds }}s</p>
+        <p v-if="currentPhase === 'REST' && stableSampling.active" class="mt-2 text-lg text-neon-orange font-semibold">恢复检测倒计时：{{ restSamplingRemainingSeconds }}s</p>
+        <p v-if="isEndSampling" class="mt-2 text-lg text-neon-orange font-semibold">训练收尾倒计时：{{ endSamplingRemainingSeconds }}s</p>
       </div>
 
       <div class="glass-panel-light rounded-2xl p-5 text-right min-w-[320px]">
@@ -232,8 +233,8 @@ const lastSpokenAiAt = ref(0)
 
 const phaseLabelMap = {
   WORK: '动作进行中，保持节奏。',
-  REST: '组间休息中，注意呼吸恢复。',
-  END: '训练结束，正在恢复。'
+  REST: '进入恢复时间，放松呼吸，准备下一组。',
+  END: '训练即将完成，请保持自然站立。'
 }
 
 const normalizeSpeechText = (text) => String(text || '').replace(/\s+/g, ' ').trim()
@@ -391,7 +392,7 @@ const enterRestPhase = () => {
     publishMotionControl(false)
   }
 
-  coachTip.value = '组间休息中。'
+  coachTip.value = '恢复时间到了，放松肩颈，均匀呼吸。'
 
   restTimer = setTimeout(() => {
     if (currentPhase.value === 'REST') {
@@ -403,7 +404,7 @@ const enterRestPhase = () => {
         publishMotionControl(true)
       }
 
-      coachTip.value = '休息结束，继续下一组。'
+      coachTip.value = '状态已恢复，开始下一组动作。'
     }
     restTimer = null
   }, sec * 1000)
@@ -424,12 +425,12 @@ const beginEndSamplingThenFinish = () => {
     publishMotionControl(false)
   }
 
-  coachTip.value = `目标已完成，请保持静止 ${END_SAMPLING_SECONDS} 秒，正在采集结束体征。`
+  coachTip.value = `训练目标已完成，请自然站立 ${END_SAMPLING_SECONDS} 秒，正在记录训练后状态。`
 
   clearEndSamplingTimer()
   endSamplingTimer = setTimeout(async () => {
     if (currentPhase.value === 'END') {
-      coachTip.value = '结束采样完成，正在结算与生成 AI 总结。'
+      coachTip.value = '记录完成，正在整理本次训练结果。'
     }
 
     // 结束采样后彻底停用节点并结算
@@ -513,7 +514,7 @@ const bindRosTopics = (cfg) => {
   const heartSpo2Name = String(heartTopicCfg.spo2 || '/heart_sensor_node/spo2').trim()
 
   if (!motionControlName || !motionStateName || !motionRepCompletedName || !motionErrorsName) {
-    coachTip.value = '动作话题配置不完整，请检查 ros_runtime.yaml 的 action_detectors.topics。'
+    coachTip.value = '动作识别暂未准备完成，请联系工作人员协助处理。'
   }
 
   rosTopics.motionControl = motionControlName ? new ROSLIB.Topic({
@@ -623,12 +624,12 @@ const bindRosTopics = (cfg) => {
     try {
       const parsed = JSON.parse(msg?.data || '{}')
       if (parsed?.msg) {
-        coachTip.value = `⚠ ${parsed.msg}`
+        coachTip.value = `提示：${parsed.msg}`
         speakAiPriority(coachTip.value)
       }
     } catch {
       if (msg?.data) {
-        coachTip.value = `⚠ ${msg.data}`
+        coachTip.value = `提示：${msg.data}`
         speakAiPriority(coachTip.value)
       }
     }
@@ -655,12 +656,12 @@ const publishMotionControl = (enabled) => {
 const togglePause = () => {
   if (rosDebugMode.value) {
     isPaused.value = !isPaused.value
-    coachTip.value = isPaused.value ? '训练已暂停。' : '训练已继续，请保持动作标准。'
+    coachTip.value = isPaused.value ? '训练已暂停，准备好后继续。' : '训练已继续，请保持动作标准。'
     return
   }
 
   if (!rosConnected.value) {
-    coachTip.value = 'ROS 未连接，无法暂停/继续。'
+    coachTip.value = '当前连接暂不可用，请稍后再试。'
     return
   }
 
@@ -674,7 +675,7 @@ const togglePause = () => {
     clearRestTimer()
     publishRosControl(false)
     isPaused.value = true
-    coachTip.value = '训练已暂停。'
+    coachTip.value = '训练已暂停，准备好后继续。'
   }
 }
 
@@ -710,7 +711,7 @@ const connectRosRealtime = (cfg) => {
         console.error('[TrainingSession][ROS] bindRosTopics failed:', error)
       }
       publishRosControl(true)
-      coachTip.value = 'ROS 已连接，正在使用实时数据。'
+      coachTip.value = '实时识别已连接，动作与体征数据同步中。'
     })
 
     rosConn.value.on('error', () => {
@@ -733,7 +734,7 @@ const startMockData = () => {
       currentRep.value += 1
       currentSet.value = Math.min(totalSets.value, Math.floor(currentRep.value / Math.max(1, repsPerSet.value)) + 1)
     } else {
-      coachTip.value = '本次训练已完成，建议进行拉伸恢复。'
+      coachTip.value = '本次训练已完成，建议做几分钟拉伸放松。'
       speakAiPriority(coachTip.value)
     }
 
@@ -996,10 +997,7 @@ onMounted(() => {
       startMockData()
     }
 
-    if (playVoice) {
-      const prefix = rosDebugMode.value ? '当前为 Windows 调试模式。' : '当前为实机模式。'
-      speakAiPriority(`${prefix}训练已开始，请保持动作标准。`)
-    }
+    speakAiPriority('训练已开始，请保持动作标准。')
   })()
 })
 
@@ -1015,11 +1013,11 @@ watch(currentPhase, (next, prev) => {
   if (next === prev) return
   if (next === 'REST') {
     const sec = Math.max(1, Number(restSeconds.value) || 45)
-    speakRestPriority(`进入休息阶段，${sec} 秒。`)
+    speakRestPriority(`进入恢复时间，还有 ${sec} 秒，请放松呼吸。`)
     return
   }
   if (prev === 'REST' && next === 'WORK') {
-    speakRestPriority('休息结束，继续训练。')
+    speakRestPriority('恢复完成，继续下一组训练。')
   }
 })
 

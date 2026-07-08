@@ -27,6 +27,9 @@ router.beforeEach((to) => {
   const isPublicRoute = to.path === '/'
 
   if (!token && !isPublicRoute) {
+    sessionStorage.removeItem('welcome_voice_pending')
+    sessionStorage.removeItem('login_context')
+    sessionStorage.removeItem('plan_ready_toast')
     return '/'
   }
 

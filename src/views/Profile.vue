@@ -2,7 +2,7 @@
   <div class="w-full h-full p-8 flex flex-col gap-6 text-white">
     <header class="shrink-0">
       <h2 class="text-4xl font-bold tracking-tight">我的信息</h2>
-      <p class="text-gray-400 mt-2">账号资料、设备状态与安全能力</p>
+      <p class="text-gray-400 mt-2">查看账号资料、设备状态与人脸录入情况</p>
     </header>
 
     <section class="grid grid-cols-12 gap-6 flex-1 min-h-0">
@@ -74,7 +74,7 @@
 
           <button @click="refreshProfile" :disabled="isLoadingProfile" class="h-28 rounded-2xl bg-white/10 border border-white/15 hover:bg-white/15 transition-all text-left px-5 disabled:opacity-60 disabled:cursor-not-allowed">
             <p class="text-lg font-bold">同步资料</p>
-            <p class="text-sm text-gray-400 mt-2">从后端重新拉取账户信息</p>
+            <p class="text-sm text-gray-400 mt-2">重新刷新当前账号资料</p>
           </button>
 
           <button @click="toggleFaceEnroll" :class="isFaceBusy ? 'bg-neon-red/20 border-neon-red/40 hover:bg-neon-red/30' : 'bg-white/10 border-white/15 hover:bg-white/15'" class="h-28 rounded-2xl border transition-all text-left px-5">
@@ -84,12 +84,12 @@
 
           <button @click="checkDevice" class="h-28 rounded-2xl bg-white/10 border border-white/15 hover:bg-white/15 transition-all text-left px-5">
             <p class="text-lg font-bold">设备校准</p>
-            <p class="text-sm text-gray-400 mt-2">检测摄像头权限与可用性</p>
+            <p class="text-sm text-gray-400 mt-2">检查摄像头权限与可用状态</p>
           </button>
 
           <button @click="logout" class="h-28 rounded-2xl bg-neon-red/20 border border-neon-red/40 hover:bg-neon-red/30 transition-all text-left px-5">
             <p class="text-lg font-bold text-neon-red">退出登录</p>
-            <p class="text-sm text-gray-300 mt-2">清除令牌并返回待机页</p>
+            <p class="text-sm text-gray-300 mt-2">退出当前账号并返回登录页</p>
           </button>
         </div>
 
@@ -654,7 +654,7 @@ const stopFaceEnroll = () => {
   faceLoopActive.value = false
   if (isFaceBusy.value) {
     statusMessage.type = 'warning'
-    statusMessage.text = '已停止连续采集'
+    statusMessage.text = '已停止人脸采集'
   }
 }
 
@@ -669,7 +669,7 @@ const toggleFaceEnroll = async () => {
 
   try {
     statusMessage.type = 'ok'
-    statusMessage.text = '连续采集中，请正对摄像头...'
+    statusMessage.text = '采集中，请正对摄像头...'
 
     activeMedia = await openCameraWithFallback()
 
@@ -702,19 +702,19 @@ const toggleFaceEnroll = async () => {
         faceFeedback.title = '请调整姿态'
         faceFeedback.desc = result?.msg || '请正对摄像头并靠近一些'
         statusMessage.type = 'warning'
-        statusMessage.text = '未通过姿态检测，正在继续采集...'
+        statusMessage.text = '姿态未通过，正在继续采集...'
       } else if (result?.code === 'IMG_ERROR') {
         faceFeedback.type = 'error'
         faceFeedback.title = '图像异常'
         faceFeedback.desc = result?.msg || '图像质量不足，请重试'
         statusMessage.type = 'warning'
-        statusMessage.text = '图像异常，正在继续采集...'
+        statusMessage.text = '图像不够清晰，正在继续采集...'
       } else {
         faceFeedback.type = 'error'
         faceFeedback.title = '录入失败'
         faceFeedback.desc = result?.msg || '返回状态异常'
         statusMessage.type = 'warning'
-        statusMessage.text = '状态异常，正在继续采集...'
+        statusMessage.text = '暂未完成录入，正在继续采集...'
       }
 
       if (faceLoopActive.value) {
@@ -724,10 +724,10 @@ const toggleFaceEnroll = async () => {
   } catch (error) {
     if (error?.data?.code === 'PARAMS_INVALID') {
       faceFeedback.type = 'error'
-      faceFeedback.title = '参数错误'
-      faceFeedback.desc = error?.data?.msg || '上传数据无效'
+      faceFeedback.title = '采集异常'
+      faceFeedback.desc = error?.data?.msg || '本次采集数据无效'
       statusMessage.type = 'error'
-      statusMessage.text = '采集数据异常，请重试'
+      statusMessage.text = '采集异常，请重新尝试'
       faceLoopActive.value = false
       return
     }
@@ -758,6 +758,9 @@ const checkDevice = async () => {
 
 const logout = () => {
   localStorage.removeItem('auth_token')
+  sessionStorage.removeItem('welcome_voice_pending')
+  sessionStorage.removeItem('login_context')
+  sessionStorage.removeItem('plan_ready_toast')
   router.push('/')
 }
 

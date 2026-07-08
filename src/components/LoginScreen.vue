@@ -204,8 +204,8 @@
       <div class="flex items-start justify-between mb-8 gap-4">
         <div>
           <p class="text-xs tracking-[0.32em] text-neon-green/90 uppercase">AI Fitness Access</p>
-          <h3 class="text-3xl font-bold mt-2 text-white">系统登录</h3>
-          <p class="text-gray-400 mt-2">使用账号密码进入训练系统</p>
+          <h3 class="text-3xl font-bold mt-2 text-white">账号登录</h3>
+          <p class="text-gray-400 mt-2">使用账号密码进入训练空间</p>
         </div>
         <button @click="switchMode(false)" class="w-11 h-11 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-gray-300 flex items-center justify-center">
           <ArrowLeft class="w-8 h-8" />
@@ -286,9 +286,21 @@ const PREFERRED_CAMERA_NAME = 'Global Shutter Camera'
 
 const scanStatus = reactive({
   title: '靠近即可唤醒',
-  desc: 'RK3588正在进行人脸检测...',
+  desc: '请面向屏幕，系统正在识别身份...',
   color: 'text-white'
 })
+
+const PLAN_READY_TOAST_KEY = 'plan_ready_toast'
+
+const getGreetingByTime = () => {
+  const hour = new Date().getHours()
+  if (hour >= 5 && hour < 8) return '早上好'
+  if (hour >= 8 && hour < 12) return '上午好'
+  if (hour >= 12 && hour < 14) return '中午好'
+  if (hour >= 14 && hour < 18) return '下午好'
+  if (hour >= 18 && hour < 23) return '晚上好'
+  return '夜深了'
+}
 
 const matchesPreferredCameraLabel = (label) => {
   const text = String(label || '').toLowerCase()
@@ -432,7 +444,7 @@ const captureAndSendFace = async () => {
       case 'AUTH_SUCCESS':
         stopFacePolling()
         scanStatus.title = '识别成功'
-        scanStatus.desc = `欢迎回来，${data.username}`
+        scanStatus.desc = `${getGreetingByTime()}，${data.username}`
         scanStatus.color = 'text-neon-green'  // 绿色：放行
         handleLoginSuccess(data.access)
         break
@@ -464,15 +476,15 @@ const captureAndSendFace = async () => {
   } catch (error) {
     if (error.status === 404) {
       scanStatus.title = '未匹配到档案'
-      scanStatus.desc = error.data?.msg || '请先使用账号登录并绑定人脸'
+      scanStatus.desc = error.data?.msg || '请先使用账号密码登录，并完成人脸录入'
       scanStatus.color = 'text-neon-orange'
     } else if (error.status === 403) {
       scanStatus.title = '账号异常'
       scanStatus.desc = error.data?.msg || '该账号已被禁用'
       scanStatus.color = 'text-neon-red'
     } else {
-      scanStatus.title = '服务异常'
-      scanStatus.desc = error.data?.msg || '无法连接到人脸识别服务'
+      scanStatus.title = '暂时无法识别'
+      scanStatus.desc = error.data?.msg || '识别暂时不可用，请稍后重试'
       scanStatus.color = 'text-neon-red'
     }
   }
@@ -601,6 +613,7 @@ const openRegister = () => {
 const closeRegister = () => {
   isRegisterOpen.value = false
   registerError.value = ''
+  registerLoading.value = false
   // 恢复摄像头轮询（若非密码模式）
   if (!isPasswordMode.value) startCamera()
   if (!isPasswordMode.value) startFacePolling()
@@ -623,14 +636,18 @@ const handleRegister = async () => {
       birthdate: registerForm.birthdate,
       goal: finalGoal.value
     })
-    // 直接登录并静默调用初始计划生成接口
-    handleLoginSuccess(data.access)
     try {
       await initGeneratePlan({ goal: finalGoal.value })
+      sessionStorage.setItem(PLAN_READY_TOAST_KEY, '1')
     } catch (e) {
-      // 生成计划失败不阻塞登录流程
+      sessionStorage.removeItem(PLAN_READY_TOAST_KEY)
     }
     closeRegister()
+    handleLoginSuccess(data.access, {
+      isFirstLogin: true,
+      username: registerForm.username,
+      refreshHome: true
+    })
   } catch (err) {
     registerError.value = err.data?.error || err.message || '注册失败'
   } finally {
@@ -649,21 +666,32 @@ const handleAccountLogin = async () => {
       username: loginForm.username,
       password: loginForm.password
     })
-    handleLoginSuccess(data.access)
+    handleLoginSuccess(data.access, {
+      username: loginForm.username
+    })
   } catch (error) {
-    errorMessage.value = error.message || '无法连接到服务器，请检查网络'
+    errorMessage.value = error.message || '登录失败，请检查账号、密码或网络状态'
   } finally {
     isLoading.value = false
   }
 }
 
-const handleLoginSuccess = (token) => {
+const handleLoginSuccess = (token, options = {}) => {
   if (token) {
     localStorage.setItem('auth_token', token)
     sessionStorage.setItem('welcome_voice_pending', '1')
+    sessionStorage.setItem('login_context', JSON.stringify({
+      isFirstLogin: !!options.isFirstLogin,
+      username: options.username || '',
+      loginAt: Date.now(),
+      refreshHome: !!options.refreshHome
+    }))
     // 延迟 800ms，让用户看清楚“识别成功”的绿色字样，然后再丝滑切走
     setTimeout(() => {
-      router.push('/home')
+      router.replace({
+        path: '/home',
+        query: options.refreshHome ? { refresh: '1' } : undefined
+      })
     }, 800)
   }
 }

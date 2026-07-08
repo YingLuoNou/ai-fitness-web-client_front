@@ -3,7 +3,7 @@
     <header class="shrink-0 flex items-end justify-between gap-4">
       <div>
         <h2 class="text-4xl font-bold tracking-tight">我的计划</h2>
-        <p class="text-gray-400 mt-2">查看当前 AI 生成的 7 天训练安排，并支持一键重新生成</p>
+        <p class="text-gray-400 mt-2">查看当前 7 天训练安排，并支持一键重新生成</p>
       </div>
       <div class="flex items-center gap-3">
         <button
@@ -72,7 +72,7 @@
               <div class="flex items-center justify-between gap-3">
                 <div>
                   <p class="text-lg font-semibold">{{ getExerciseName(exercise.type) }}</p>
-                  <p class="text-xs text-gray-400 mt-1">动作代码：{{ exercise.type }}</p>
+                  <p class="text-xs text-gray-400 mt-1">训练项目已就绪</p>
                 </div>
                 <div class="text-right text-sm text-gray-300">
                   <p>{{ exercise.sets || 0 }} 组</p>
@@ -167,7 +167,7 @@ const loadPlan = async () => {
 const regeneratePlan = async () => {
   if (isRegenerating.value) return
   isRegenerating.value = true
-  statusMessage.value = { type: 'ok', text: '正在请求 AI 重新生成计划...' }
+  statusMessage.value = { type: 'ok', text: '正在重新整理你的训练计划...' }
   try {
     await initGeneratePlan({ goal: profile.value?.goal || '提升耐力' })
     await loadPlan()

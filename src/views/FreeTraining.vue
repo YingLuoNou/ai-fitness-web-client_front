@@ -91,7 +91,7 @@ const toggleExercise = (value) => {
 const startTraining = async () => {
   if (exerciseOptions.value.length === 0) {
     status.type = 'error'
-    status.text = '当前没有可用动作，请先在 ros_runtime.yaml 的 action_detectors 中启用动作'
+    status.text = '当前还没有可用训练动作，请稍后再试'
     return
   }
 
@@ -125,7 +125,7 @@ const startTraining = async () => {
   try {
     const data = await startTrainSession(payload)
     status.type = 'ok'
-    status.text = '训练会话创建成功，正在进入训练页'
+    status.text = '训练已创建，正在进入训练页'
 
     router.push({
       path: '/training-session',
@@ -140,7 +140,7 @@ const startTraining = async () => {
     })
   } catch (error) {
     status.type = 'error'
-    status.text = '训练会话启动失败，请检查后端接口'
+    status.text = '启动失败，请稍后重试'
   } finally {
     isSubmitting.value = false
   }
@@ -153,7 +153,7 @@ const hydrateExercises = async () => {
       exerciseOptions.value = []
       selectedExercises.value = []
       status.type = 'error'
-      status.text = '未检测到已启用动作，请检查后端动作识别配置'
+      status.text = '暂未检测到可用动作，请稍后再试'
       return
     }
 
@@ -165,12 +165,12 @@ const hydrateExercises = async () => {
 
     selectedExercises.value = [exerciseOptions.value[0].value]
     status.type = 'ok'
-    status.text = `已加载 ${exerciseOptions.value.length} 个可用动作`
+    status.text = `已加载 ${exerciseOptions.value.length} 个训练动作`
   } catch (error) {
     exerciseOptions.value = []
     selectedExercises.value = []
     status.type = 'error'
-    status.text = '动作配置读取失败，请检查后端服务与配置文件'
+    status.text = '动作列表加载失败，请稍后重试'
   }
 }
 
