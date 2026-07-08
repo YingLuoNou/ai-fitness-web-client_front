@@ -15,8 +15,8 @@
       <div class="flex items-center gap-3">
         <span class="text-2xl">✅</span>
         <div>
-          <p class="text-xl font-bold">你的训练计划已生成完成</p>
-          <p class="text-sm text-neon-green/80 mt-1">可以直接开始今天的训练，或先查看完整安排。</p>
+          <p class="text-xl font-bold">{{ planToastTitle }}</p>
+          <p class="text-sm text-neon-green/80 mt-1">{{ planToastDesc }}</p>
         </div>
       </div>
     </div>
@@ -138,8 +138,10 @@ const speakWithBackendTts = inject('speakWithBackendTts')
 const router = useRouter()
 const WELCOME_VOICE_PENDING_KEY = 'welcome_voice_pending'
 const PLAN_READY_TOAST_KEY = 'plan_ready_toast'
+const DASHBOARD_POLL_INTERVAL_MS = 6000
 let planReadyToastTimer = null
 let planPollTimer = null
+let dashboardRefreshInterval = null
 let isPollingPlan = false
 
 // --- 时钟逻辑 ---
@@ -166,6 +168,8 @@ const dashboardData = reactive({
 const isStartingPlan = ref(false)
 const statusMessage = reactive({ type: 'ok', text: '' })
 const planReadyToastVisible = ref(false)
+const planToastTitle = ref('你的训练计划已生成完成')
+const planToastDesc = ref('可以直接开始今天的训练，或先查看完整安排。')
 const hasActivePlan = computed(() => !!dashboardData.plan_status?.active_plan_id)
 const isWaitingPlanGeneration = computed(() => !!loginContext.value?.waitingPlanGeneration)
 
@@ -206,13 +210,23 @@ const headerSubtitle = computed(() => {
   return '今天有一组训练计划等待完成，准备好开始了吗？'
 })
 
-const showPlanReadyToast = () => {
+const showPlanToast = (title, desc) => {
+  planToastTitle.value = title
+  planToastDesc.value = desc
   planReadyToastVisible.value = true
   if (planReadyToastTimer) clearTimeout(planReadyToastTimer)
   planReadyToastTimer = setTimeout(() => {
     planReadyToastVisible.value = false
     planReadyToastTimer = null
   }, 4500)
+}
+
+const showPlanReadyToast = () => {
+  showPlanToast('你的训练计划已生成完成', '可以直接开始今天的训练，或先查看完整安排。')
+}
+
+const showPlanUpdatedToast = () => {
+  showPlanToast('训练计划已更新', '已根据你最新训练表现优化后续安排。')
 }
 
 const clearPlanPolling = () => {
@@ -297,16 +311,20 @@ const hydrateExerciseDict = async () => {
 const fetchDashboardData = async () => {
   try {
     const data = await fetchDashboard()
-    const hadPlanBefore = !!dashboardData.plan_status?.active_plan_id
+    const previousPlanId = dashboardData.plan_status?.active_plan_id
+    const hadPlanBefore = !!previousPlanId
     Object.assign(dashboardData, data) // 更新界面
 
-    const hasPlanNow = !!data?.plan_status?.active_plan_id
+    const currentPlanId = data?.plan_status?.active_plan_id
+    const hasPlanNow = !!currentPlanId
     if (isWaitingPlanGeneration.value && hasPlanNow) {
       if (!hadPlanBefore) {
         showPlanReadyToast()
       }
       stopPlanWaitingState()
       statusMessage.text = ''
+    } else if (previousPlanId && currentPlanId && previousPlanId !== currentPlanId) {
+      showPlanUpdatedToast()
     }
 
     const username = data?.user_info?.username || '用户'
@@ -327,6 +345,13 @@ const fetchDashboardData = async () => {
       router.push('/')
     }
   }
+}
+
+const startDashboardAutoRefresh = () => {
+  if (dashboardRefreshInterval) clearInterval(dashboardRefreshInterval)
+  dashboardRefreshInterval = setInterval(() => {
+    fetchDashboardData()
+  }, DASHBOARD_POLL_INTERVAL_MS)
 }
 
 const pollPlanGenerationStatus = async () => {
@@ -420,6 +445,7 @@ onMounted(() => {
   timeInterval = setInterval(updateTime, 1000)
   hydrateExerciseDict()
   fetchDashboardData() // 进入页面即拉取
+  startDashboardAutoRefresh()
   if (isWaitingPlanGeneration.value) {
     statusMessage.type = 'ok'
     statusMessage.text = '正在为你生成专属训练计划，请稍候...'
@@ -429,6 +455,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   if (timeInterval) clearInterval(timeInterval)
+  if (dashboardRefreshInterval) clearInterval(dashboardRefreshInterval)
   if (planReadyToastTimer) clearTimeout(planReadyToastTimer)
   clearPlanPolling()
 })
