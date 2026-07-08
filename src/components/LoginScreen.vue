@@ -636,7 +636,13 @@ const handleRegister = async () => {
       birthdate: registerForm.birthdate,
       goal: finalGoal.value
     })
+    if (data?.access) {
+      localStorage.setItem('auth_token', data.access)
+    }
+
+    let planInitStarted = false
     try {
+      planInitStarted = true
       await initGeneratePlan({ goal: finalGoal.value })
       sessionStorage.setItem(PLAN_READY_TOAST_KEY, '1')
     } catch (e) {
@@ -646,7 +652,8 @@ const handleRegister = async () => {
     handleLoginSuccess(data.access, {
       isFirstLogin: true,
       username: registerForm.username,
-      refreshHome: true
+      refreshHome: true,
+      waitingPlanGeneration: planInitStarted
     })
   } catch (err) {
     registerError.value = err.data?.error || err.message || '注册失败'
@@ -684,7 +691,8 @@ const handleLoginSuccess = (token, options = {}) => {
       isFirstLogin: !!options.isFirstLogin,
       username: options.username || '',
       loginAt: Date.now(),
-      refreshHome: !!options.refreshHome
+      refreshHome: !!options.refreshHome,
+      waitingPlanGeneration: !!options.waitingPlanGeneration
     }))
     // 延迟 800ms，让用户看清楚“识别成功”的绿色字样，然后再丝滑切走
     setTimeout(() => {

@@ -139,6 +139,8 @@ const router = useRouter()
 const WELCOME_VOICE_PENDING_KEY = 'welcome_voice_pending'
 const PLAN_READY_TOAST_KEY = 'plan_ready_toast'
 let planReadyToastTimer = null
+let planPollTimer = null
+let isPollingPlan = false
 
 // --- 时钟逻辑 ---
 const currentTime = ref('')
@@ -164,6 +166,8 @@ const dashboardData = reactive({
 const isStartingPlan = ref(false)
 const statusMessage = reactive({ type: 'ok', text: '' })
 const planReadyToastVisible = ref(false)
+const hasActivePlan = computed(() => !!dashboardData.plan_status?.active_plan_id)
+const isWaitingPlanGeneration = computed(() => !!loginContext.value?.waitingPlanGeneration)
 
 const getGreetingByTime = () => {
   const hour = new Date().getHours()
@@ -187,8 +191,11 @@ const loginContext = computed(() => {
 })
 
 const headerSubtitle = computed(() => {
-  if (loginContext.value?.isFirstLogin) {
+  if (loginContext.value?.isFirstLogin && loginContext.value?.waitingPlanGeneration) {
     return '欢迎加入，专属训练计划已为你准备中。'
+  }
+  if (loginContext.value?.isFirstLogin) {
+    return '欢迎加入，专属训练计划已经准备好了。'
   }
   if (dashboardData.plan_status.today_exercises.length === 0) {
     return '今天安排以恢复放松为主，记得给身体一点缓冲时间。'
@@ -206,6 +213,29 @@ const showPlanReadyToast = () => {
     planReadyToastVisible.value = false
     planReadyToastTimer = null
   }, 4500)
+}
+
+const clearPlanPolling = () => {
+  if (planPollTimer) {
+    clearTimeout(planPollTimer)
+    planPollTimer = null
+  }
+}
+
+const stopPlanWaitingState = () => {
+  const nextContext = {
+    ...loginContext.value,
+    waitingPlanGeneration: false
+  }
+  sessionStorage.setItem('login_context', JSON.stringify(nextContext))
+  clearPlanPolling()
+}
+
+const schedulePlanPolling = (delay = 4000) => {
+  clearPlanPolling()
+  planPollTimer = setTimeout(() => {
+    pollPlanGenerationStatus()
+  }, delay)
 }
 
 // --- 动态计算 BMI ---
@@ -267,7 +297,17 @@ const hydrateExerciseDict = async () => {
 const fetchDashboardData = async () => {
   try {
     const data = await fetchDashboard()
+    const hadPlanBefore = !!dashboardData.plan_status?.active_plan_id
     Object.assign(dashboardData, data) // 更新界面
+
+    const hasPlanNow = !!data?.plan_status?.active_plan_id
+    if (isWaitingPlanGeneration.value && hasPlanNow) {
+      if (!hadPlanBefore) {
+        showPlanReadyToast()
+      }
+      stopPlanWaitingState()
+      statusMessage.text = ''
+    }
 
     const username = data?.user_info?.username || '用户'
     const shouldPlayWelcome = sessionStorage.getItem(WELCOME_VOICE_PENDING_KEY) === '1'
@@ -286,6 +326,19 @@ const fetchDashboardData = async () => {
       localStorage.removeItem('auth_token')
       router.push('/')
     }
+  }
+}
+
+const pollPlanGenerationStatus = async () => {
+  if (isPollingPlan || !isWaitingPlanGeneration.value) return
+  isPollingPlan = true
+  try {
+    await fetchDashboardData()
+    if (isWaitingPlanGeneration.value && !hasActivePlan.value) {
+      schedulePlanPolling(4000)
+    }
+  } finally {
+    isPollingPlan = false
   }
 }
 
@@ -367,11 +420,17 @@ onMounted(() => {
   timeInterval = setInterval(updateTime, 1000)
   hydrateExerciseDict()
   fetchDashboardData() // 进入页面即拉取
+  if (isWaitingPlanGeneration.value) {
+    statusMessage.type = 'ok'
+    statusMessage.text = '正在为你生成专属训练计划，请稍候...'
+    schedulePlanPolling(4000)
+  }
 })
 
 onBeforeUnmount(() => {
   if (timeInterval) clearInterval(timeInterval)
   if (planReadyToastTimer) clearTimeout(planReadyToastTimer)
+  clearPlanPolling()
 })
 </script>
 
