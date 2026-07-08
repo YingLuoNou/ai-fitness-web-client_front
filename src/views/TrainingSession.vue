@@ -52,6 +52,10 @@
         <p v-if="currentPhase === 'REST'" class="mt-3 text-lg text-cyan-200 font-semibold">休息倒计时：{{ restRemainingSeconds }}s</p>
         <p v-if="currentPhase === 'REST' && stableSampling.active" class="mt-2 text-lg text-neon-orange font-semibold">恢复检测倒计时：{{ restSamplingRemainingSeconds }}s</p>
         <p v-if="isEndSampling" class="mt-2 text-lg text-neon-orange font-semibold">训练收尾倒计时：{{ endSamplingRemainingSeconds }}s</p>
+        <div v-if="rosStageText" class="mt-4 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+          <p class="text-[11px] text-gray-400 tracking-[0.22em]">阶段状态</p>
+          <p class="mt-1 text-sm text-gray-200 leading-5">{{ rosStageText }}</p>
+        </div>
       </div>
 
       <div class="glass-panel-light rounded-2xl p-5 text-right min-w-[320px]">
@@ -105,6 +109,7 @@ const restSeconds = ref(Math.max(1, Number(route.query.restSec) || 45))
 const currentRep = ref(0)
 const isPaused = ref(false)
 const coachTip = ref('保持核心收紧，动作速度均匀。')
+const rosStageText = ref('')
 const runtimeMode = ref('windows_debug')
 const rosDebugMode = ref(true)
 const sessionRealtimeSourceMode = ref('simulated')
@@ -613,9 +618,8 @@ const bindRosTopics = (cfg) => {
     } catch {
       text = msg?.data || ''
     }
-    if (text && currentPhase.value !== 'REST') {
-      coachTip.value = text
-      speakAiPriority(text)
+    if (text) {
+      rosStageText.value = text
     }
   })
 
@@ -624,13 +628,13 @@ const bindRosTopics = (cfg) => {
     try {
       const parsed = JSON.parse(msg?.data || '{}')
       if (parsed?.msg) {
+        rosStageText.value = parsed.msg
         coachTip.value = `提示：${parsed.msg}`
-        speakAiPriority(coachTip.value)
       }
     } catch {
       if (msg?.data) {
+        rosStageText.value = msg.data
         coachTip.value = `提示：${msg.data}`
-        speakAiPriority(coachTip.value)
       }
     }
   })
@@ -799,10 +803,9 @@ const fetchSessionState = async () => {
 
     if (!rosAuthoritative || data.phase === 'END') {
       const incomingTip = data.coach_message || phaseLabelMap[data.phase] || data.tip || coachTip.value
-      const tipChanged = normalizeSpeechText(incomingTip) !== normalizeSpeechText(coachTip.value)
       coachTip.value = incomingTip
-      if (tipChanged && currentPhase.value !== 'REST') {
-        speakAiPriority(incomingTip)
+      if (data.tip) {
+        rosStageText.value = data.tip
       }
     }
 
